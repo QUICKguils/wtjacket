@@ -7,8 +7,5 @@
 # Personnal draft files
 draft.m
 
-# Don't track changes in the MAT files.
-*.mat
-
-# Don't track changes for the plotting data.
-Plot/
+# Don't track changes for the result files
+res/
