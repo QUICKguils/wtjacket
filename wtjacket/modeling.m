@@ -13,7 +13,8 @@ function modeling(sdiv, opts)
 % Directory where the present file lies.
 file_dir = fileparts(mfilename("fullpath"));
 
-% Bare structure data.
+% Contants and bare structure data.
+C  = load(fullfile(file_dir, "../res/constants.mat"));
 BS = load(fullfile(file_dir, "../res/bare_struct.mat"));
 n_belem = numel(BS.elemList);
 n_bnode = numel(BS.nodeList);
@@ -74,9 +75,16 @@ end
 		figure("WindowStyle", "docked");
 		hold on;
 		for e = el(1:end)
+			if e{:}.n1.pos(3) > C.f_height(end) ...
+					|| e{:}.n2.pos(3) > C.f_height(end)  % ignore nacelle
+				continue
+			end
 			e{:}.plotElem()
 		end
 		for node = nl(1:end)
+			if node{:}.pos(3) > C.f_height(end)  % ignone nacelle
+				continue
+			end
 			node{:}.plotNode()
 		end
 		axis equal; grid; view([-0.75, -1, 0.75]);
