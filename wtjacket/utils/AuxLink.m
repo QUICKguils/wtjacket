@@ -1,5 +1,5 @@
 classdef AuxLink < Elem
-	% BEAM  Represent a main link beam.
+	% AUXLINK  Represent a main link beam.
 
 	methods
 		function al = AuxLink(n1, n2)

@@ -1,5 +1,5 @@
 classdef MainLink < Elem
-	% BEAM  Represent a main link beam.
+	% MAINLINK  Represent a main link beam.
 
 	methods
 		function ml = MainLink(n1, n2)

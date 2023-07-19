@@ -1,5 +1,5 @@
 classdef Elem
-	% ELEM
+	% ELEM Represent a 3D beam element.
 
 	properties
 		% Matertial properties.
@@ -19,17 +19,19 @@ classdef Elem
 	end
 
 	methods
-		function elem = Elem(d, n1, n2)
+		function elem = Elem(d, n1, n2, varargin)
 			% ELEM  Construct an instance of Elem.
-			elem.d   = d;
-			elem.n1  = n1;
-			elem.n2  = n2;
+			if nargin > 0
+				elem.d   = d;
+				elem.n1  = n1;
+				elem.n2  = n2;
 
-			elem.G = elem.E / (2*(1+elem.nu));
-			elem.A   = 2*pi * elem.d^2/4;
-			elem.Iyy = pi * (6*elem.d^3+8*elem.d)/64;  % tubular section
-			elem.Izz = elem.Iyy;
-			elem.Jx  = elem.Iyy + elem.Izz;
+				elem.G = elem.E / (2*(1+elem.nu));
+				elem.A   = 2*pi * elem.d^2/4;
+				elem.Iyy = pi * (6*elem.d^3+8*elem.d)/64;  % tubular section
+				elem.Izz = elem.Iyy;
+				elem.Jx  = elem.Iyy + elem.Izz;
+			end
 		end
 
 		function l = length(elem)

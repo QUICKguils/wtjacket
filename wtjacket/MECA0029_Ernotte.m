@@ -25,24 +25,20 @@ addpath(genpath(fullfile(root_dir, "wtjacket")));
 
 % Initialize MAT file.
 constants();
-BareStruct(opts);
+bare_struct(opts);
 
 %% Execute the code
 
 % Load project constants.
 C  = load(fullfile(root_dir, "res/constants.mat"));
-BS = load(fullfile(root_dir, "res/BareStruct.mat"));
+BS = load(fullfile(root_dir, "res/bare_struct.mat"));
 
-disp(C.rho);
-disp(BS.NodeList);
+% 1. Modeling of the structure.
+sdiv = 3;
+modeling(sdiv, opts);
 
-% % 1. Modeling of the structure.
-% propulsion();
-% pr_diagram('s', opts);
-% 
-% % 2. Transient response.
-% 
-% % 3. Reduction methods.
+% 2. Transient response.
 
+% 3. Reduction methods.
 
 end
