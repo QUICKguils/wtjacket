@@ -1,7 +1,9 @@
-function MECA0029_Ernotte(opts)
+function MECA0029_Ernotte(sdiv, opts)
 % MECA_0029_ERNOTTE  triggers all the code of the project.
 %
-% Argument:
+% Arguments:
+%	sdiv: int, optional. Default is 3.
+%	  Number of subsivisions in the bare structure.
 %	opts: char {'p', 'w'}, optional. Default is 'p'.
 %	  'p' -> Enable plots creation.
 %	  'w' -> Write plotting data in external file.
@@ -10,8 +12,10 @@ close all;
 
 %% Options setting
 
-% Option defaults: generate the plots.
-if ~nargin
+if nargin == 0
+	sdiv = 3;
+	opts = 'p';
+elseif nargin == 1
 	opts = 'p';
 end
 
@@ -34,7 +38,6 @@ C  = load(fullfile(root_dir, "res/constants.mat"));
 BS = load(fullfile(root_dir, "res/bare_struct.mat"));
 
 % 1. Modeling of the structure.
-sdiv = 3;
 modeling(sdiv, opts);
 
 % 2. Transient response.

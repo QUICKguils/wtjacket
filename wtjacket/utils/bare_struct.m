@@ -1,18 +1,11 @@
 function bare_struct(opts)
 % BARE_STRUCT  Definition of the wind turbine jacket structure.
 %
-% Argument:
-%	opts: char {'p'}, optional. Default is 'p'.
-%	  'p' -> Enable plots creation.
+% opts: char {'p'} -- Enable plots creation.
 
 % Reset internal state of classes (counters, etc).
 clear Node;
 clear Elem;
-
-% Option defaults: generate the plots.
-if ~nargin
-	opts = 'p';
-end
 
 % Directory where the present file lies.
 file_dir = fileparts(mfilename("fullpath"));

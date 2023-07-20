@@ -7,7 +7,6 @@ function constants
 %% Geometry
 
 C.angle    = 3;                  % Angle of the main legs w.r.t. the Z-axis [°].
-C.t_wall   = 0.02;               % Thickness of the beam cross-section walls [m].
 C.b_width  = 5;                  % Width at the base of the structure [m].
 C.f_height = [0, 1, 9, 17, 25];  % Heights of the horizontal frames [m].
 C.n_height = 80;                 % Height of the nacelle [m].

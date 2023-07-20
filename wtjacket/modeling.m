@@ -2,9 +2,9 @@ function modeling(sdiv, opts)
 % MODELING  Model of the wt jacket, using 3D beam elements.
 %
 % Arguments:
-%	sdiv: int, optional. Default is 4.
+%	sdiv: int
 %	  Number of subsivisions in the bare structure.
-%	opts: char {'p', 'w'}, optional. Default is 'p'.
+%	opts: char {'p', 'w'}
 %	  'p' -> Enable plots creation.
 %	  'w' -> Write plotting data in external file.
 
@@ -19,67 +19,83 @@ BS = load(fullfile(file_dir, "../res/bare_struct.mat"));
 n_belem = numel(BS.elemList);
 n_bnode = numel(BS.nodeList);
 
-%% Options setting
+%% Mains solve
 
-if nargin == 0
-	sdiv = 4;
-	opts = 'p';
-elseif nargin == 1
-	opts = 'p';
+% 1. Generate the subdivised structure.
+
+% Lists of subnodes and subelements that are created.
+[nodeList, elemList] = sdiv_struct(sdiv);
+
+% Plotting the subdivised structure, if desired.
+if contains(opts, 'p')
+	plot_struct(elemList, nodeList);
 end
 
-%% Creation of the subdivised structure
+% 2. Generate Kel and Mel.
 
-% Preallocate the node and element lists of the subdivised structure.
-nodeList = cell(1, n_bnode + (sdiv-1)*n_belem);
-elemList = cell(1, sdiv*n_belem);
-% Prefill the nodeList with existing bare nodes.
-nodeList(1: n_bnode) = BS.nodeList;
+% 3. Generate K
 
+%% 1. Generate the subdivised structure
 
-for i = 1:n_belem
-	% Extract element and extremity nodes (for terseness).
-	elem = BS.elemList{i};
-	n1 = elem.n1;
-	n2 = elem.n2;
-	% Preallocate new subelements and subnodes.
-	selem = cell(1, sdiv);
-	snode = cell(1, sdiv+1);
-	% Prefill the subnodes.
-	snode([1, end]) = {n1, n2};
-	% Create subnodes.
-	for j = 2:numel(snode)-1
-		snode{j} = Node(n1.pos + (n2.pos-n1.pos)./sdiv*(j-1));
+	function [nodeList, elemList] = sdiv_struct(sdiv)
+		% SDIV_STRUCT  Generate nodes and elements of the subdivised structure.
+		%
+		% Argument:
+		%	sdiv (int) -- Number of subsivisions desired.
+		% Returns:
+		%	nodeList {1xN Node} -- Cell of created nodes.
+		%	elemList {1xN Elem} -- Cell of created elements.
+
+		% Preallocate the node and element lists of the subdivised structure.
+		nodeList = cell(1, n_bnode + (sdiv-1)*n_belem);
+		elemList = cell(1, sdiv*n_belem);
+		% Prefill the nodeList with existing bare nodes.
+		nodeList(1: n_bnode) = BS.nodeList;
+
+		for i = 1:n_belem
+			% Extract element and extremity nodes (for terseness).
+			elem = BS.elemList{i};
+			n1 = elem.n1;
+			n2 = elem.n2;
+			% Preallocate new subelements and subnodes.
+			selem = cell(1, sdiv);
+			snode = cell(1, sdiv+1);
+			% Prefill the subnodes.
+			snode([1, end]) = {n1, n2};
+			% Create subnodes.
+			for j = 2:numel(snode)-1
+				snode{j} = Node(n1.pos + (n2.pos-n1.pos)./sdiv*(j-1));
+			end
+			% Determine link type of selem.
+			switch class(elem)
+				case 'MainLink'
+					subLink = @MainLink;
+				case 'AuxLink'
+					subLink = @AuxLink;
+				case 'RigidLink'
+					subLink = @RigidLink;
+			end
+			% Create subelements.
+			for j = 1:numel(selem)
+				selem{j} = subLink(snode{j}, snode{j+1});
+			end
+			% Fill the nodeList and elemList.
+			nodeList(n_bnode + (i-1)*(numel(snode)-2) + (1:(numel(snode)-2))) = snode(2:end-1);
+			elemList((i-1)*(numel(selem)) + (1:numel(selem))) = selem;
+
+		end
 	end
-	% Determine Link type of selem.
-	switch class(elem)
-		case 'MainLink'
-			subLink = @MainLink;
-		case 'AuxLink'
-			subLink = @AuxLink;
-		case 'RigidLink'
-			subLink = @RigidLink;
-	end
-	% Create subelements.
-	for j = 1:numel(selem)
-		selem{j} = subLink(snode{j}, snode{j+1});
-	end
-	% Fill the nodeList and elemList.
-	nodeList(n_bnode + (i-1)*(numel(snode)-2) + (1:(numel(snode)-2))) = snode(2:end-1);
-	elemList((i-1)*(numel(selem)) + (1:numel(selem))) = selem;
-
-end
 
 	function plot_struct(el, nl)
 		% PLOT_STRUCT  Get an overview of the structure.
 		figure("WindowStyle", "docked");
 		hold on;
-		for e = el(1:end)
-			if e{:}.n1.pos(3) > C.f_height(end) ...
-					|| e{:}.n2.pos(3) > C.f_height(end)  % ignore nacelle
+		for elem = el(1:end)
+			if elem{:}.n1.pos(3) > C.f_height(end) ...
+					|| elem{:}.n2.pos(3) > C.f_height(end)  % ignore nacelle
 				continue
 			end
-			e{:}.plotElem()
+			elem{:}.plotElem()
 		end
 		for node = nl(1:end)
 			if node{:}.pos(3) > C.f_height(end)  % ignone nacelle
@@ -91,8 +107,6 @@ end
 		hold off;
 	end
 
-if contains(opts, 'p')
-	plot_struct(elemList, nodeList);
-end
+%% 2. Generate Kel and Mel
 
 end
