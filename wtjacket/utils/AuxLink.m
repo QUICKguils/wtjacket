@@ -5,8 +5,8 @@ classdef AuxLink < Elem
 		function al = AuxLink(n1, n2)
 			% AUXLINK  Construct an instance of AuxLink.
 
-			% Assigned values (see project statement).
-			d = 0.6;  % Diameter [m].
+			% Assigned diameter [m] (see project statement).
+			d = 0.6;
 			
 			al = al@Elem(d, n1, n2);
 		end

@@ -1,7 +1,12 @@
 function bare_struct(opts)
 % BARE_STRUCT  Definition of the wind turbine jacket structure.
 %
-% opts: char {'p'} -- Enable plots creation.
+% Argument:
+%	opts (char {'p'}) -- Enable plots creation.
+% Save:
+%	BS (Struct) with fields:
+%	  nodeList {1xN Node} -- Cell of bare structure nodes.
+%	  elemList {1xN Elem} -- Cell of bare structure elements.
 
 % Reset internal state of classes (counters, etc).
 clear Node;
@@ -16,8 +21,10 @@ C  = load(fullfile(file_dir, "../../res/constants.mat"));
 %% Nodes
 
 	function frame = elevate(h)
-		% ELEVATE  Create the four nodes of a frame at altitude h [m].
-
+		% ELEVATE  Create a frame of nodes, for the desired altitude.
+		%
+		% Argument: h       (double)   -- Altitude [m].
+		% Return:   elevate {1x4 Node} -- Frame of nodes.
 		shift = tand(C.angle) * h;
 		frame = {
 			Node([          shift,           shift,  h]);
@@ -37,9 +44,6 @@ nodeList = [
 	% The two nodes to attach the nacelle.
 	{Node([C.b_width/2, C.b_width/2, C.f_height(end)])};
 	{Node([C.b_width/2, C.b_width/2, C.n_height     ])}]';
-
-% % Organize the node coordinates in a 2D array.
-% posList = reshape([nodeList.pos], 3, [])';
 
 %% Elements
 
@@ -107,22 +111,39 @@ elemList = {
 	RigidLink(nodeList{21}, nodeList{22});
 	}';
 
-	function plot_bare_struct(el, nl)
+%% Bare structure plot
+
+	function plot_bare_struct(nl, el)
 		% PLOT_BARE_STRUCT  Get an overview of the bare structure.
+		%
+		% Arguments:
+		%	nl {1xN Node} -- Cell of nodes.
+		%	el {1xN Elem} -- Cell of elements.
+
+		% Instantiate a figure object.
 		figure("WindowStyle", "docked");
 		hold on;
-		for elem = el(1:end-1)  % neglect nacelle beam
-			elem{:}.plotElem()
-		end
-		for node = nl(1:end-1)  % neglect nacelle
+		% Plot the nodes.
+		for node = nl(1:end-1)  % ignore nacelle
 			node{:}.plotNode()
 		end
-		axis equal; grid; view([-0.75, -1, 0.75]);
+		% Plot the elements.
+		for elem = el(1:end-1)  % ignore nacelle
+			elem{:}.plotElem()
+		end
+		% Dress the plot.
+		xlabel("X-coord. [m]");
+		ylabel("Y-coord. [m]");
+		zlabel("Z-coord. [m]");
+		title("Bare structure");
+		axis equal;
+		grid;
+		view([-0.75, -1, 0.75]);
 		hold off;
 	end
 
 if contains(opts, 'p')
-	plot_bare_struct(elemList, nodeList);
+	plot_bare_struct(nodeList, elemList);
 end
 
 %% Save data into bare_struct.mat
@@ -130,7 +151,6 @@ end
 % Gather relevant data to save.
 BS.elemList = elemList;
 BS.nodeList = nodeList;
-% BS.posList  = posList;
 
 % Save data in bare_struct.mat, which lies in the /res directory.
 save(fullfile(file_dir, "../../res/bare_struct.mat"), "-struct", "BS");

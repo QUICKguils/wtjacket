@@ -10,13 +10,14 @@ classdef RigidLink < MainLink
 
 			rl = rl@MainLink(n1, n2);
 
-			rl.rho = rl.rho * 1e4;
-			rl.E   = rl.E   * 1e4;
-			rl.A   = rl.A   * 1e-2;
-			rl.Iyy = rl.Iyy * 1e4;
-			rl.Izz = rl.Izz * 1e4;
-			rl.Jx  = rl.Jx  * 1e4;
+			rl.rho  = rl.rho  * 1e4;
+			rl.E    = rl.E    * 1e4;
+			rl.area = rl.area * 1e-2;
+			rl.Iyy  = rl.Iyy  * 1e4;
+			rl.Izz  = rl.Izz  * 1e4;
+			rl.Jx   = rl.Jx   * 1e4;
 		end
+
 
 		function plotElem(rl)
 			plotElem@Elem(rl, Color=[0.4660 0.6740 0.1880], LineWidth=1.5);

@@ -5,8 +5,8 @@ classdef MainLink < Elem
 		function ml = MainLink(n1, n2)
 			% MAINLINK  Construct an instance of MainLink.
 
-			% Assigned values (see project statement).
-			d = 1;  % Diameter [m].
+			% Assigned diameter [m] (see project statement).
+			d = 1;
 
 			ml = ml@Elem(d, n1, n2);
 		end
