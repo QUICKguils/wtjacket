@@ -8,6 +8,7 @@ classdef Elem
 		E   = 210e9;                    % Young's modulus [N/m²].
 		G   (1, 1) double {mustBeReal}  % Shear modulus [N/m²].
 		% Geometric properties.
+		w_thick  = 0.02;                % Thickness of the cross-section walls [m].
 		d   (1, 1) double {mustBeReal}  % Cross-section diameter [m].
 		A   (1, 1) double {mustBeReal}  % Cross-section area [m²].
 		Iyy (1, 1) double {mustBeReal}  % Area moment along the local y axis [m^4].
@@ -28,7 +29,7 @@ classdef Elem
 
 				elem.G = elem.E / (2*(1+elem.nu));
 				elem.A   = 2*pi * elem.d^2/4;
-				elem.Iyy = pi * (6*elem.d^3+8*elem.d)/64;  % tubular section
+				elem.Iyy = pi * ((elem.d+elem.w_thick/2)^4-(elem.d-elem.w_thick/2))/64;  % tubular section
 				elem.Izz = elem.Iyy;
 				elem.Jx  = elem.Iyy + elem.Izz;
 			end
