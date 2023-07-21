@@ -8,8 +8,6 @@ function MECA0029_Ernotte(sdiv, opts)
 %	  'p' -> Enable plots creation.
 %	  'w' -> Write plotting data in external file.
 
-close all;
-
 %% Options setting
 
 if nargin == 0
@@ -19,13 +17,17 @@ elseif nargin == 1
 	opts = 'p';
 end
 
-%% Set path and global MAT files
+%% Set program initial state
 
 % Find the root directory of the project.
 root_dir = fullfile(fileparts(mfilename('fullpath')), "..");
 
 % % Add resursively sub-directories in the Matlab path.
 addpath(genpath(fullfile(root_dir, "wtjacket")));
+
+% Reset class internal states, close previous plots.
+clear Node Elem
+close all;
 
 % Initialize MAT file.
 constants();

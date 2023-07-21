@@ -2,7 +2,7 @@ classdef Node
 	% NODE  Represent a 3D structural node.
 
 	properties (Constant)
-		ndof = 6;  % Number of DOFs of a node.
+		nbDOF = 6;  % Number of DOFs of a node.
 	end
 
 	properties
@@ -32,8 +32,8 @@ classdef Node
 			if isempty(dof_cnt)
 				dof_cnt = 0;
 			end
-			dof = dof_cnt + (1:Node.ndof);
-			dof_cnt = dof_cnt + Node.ndof;
+			dof = dof_cnt + (1:Node.nbDOF);
+			dof_cnt = dof_cnt + Node.nbDOF;
 		end
 	end
 

@@ -2,11 +2,23 @@ function modeling(sdiv, opts)
 % MODELING  Model of the wt jacket, using 3D beam elements.
 %
 % Arguments:
-%	sdiv: int
-%	  Number of subsivisions in the bare structure.
-%	opts: char {'p', 'w'}
+%	sdiv (int)
+%	  Number of subdivisions in the bare structure.
+%	opts (char {'p', 'w'})
 %	  'p' -> Enable plots creation.
 %	  'w' -> Write plotting data in external file.
+% Save:
+%	SS (struct) with fields:
+%		listNode {1xN Node} -- Cell list of subdivised structure nodes.
+%		listElem {1xN Elem} -- Cell list of subdivised structure elements.
+%		nbNode   (int)      -- Number    of subdivised structure nodes.
+%		nbElem   (int)      -- Number    of subdivised structure elements.
+%		nbDOF    (int)      -- Number    of subdivised structure DOFs.
+
+%% TODO
+
+% - Implement the write option.
+% - Tidy up shared variables and argument variables.
 
 %% Imports
 
@@ -16,39 +28,35 @@ file_dir = fileparts(mfilename("fullpath"));
 % Constants and bare structure data.
 C  = load(fullfile(file_dir, "../res/constants.mat"));
 BS = load(fullfile(file_dir, "../res/bare_struct.mat"));
-n_bnode = numel(BS.nodeList);
-n_belem = numel(BS.elemList);
 
 %% Mains solve
 
 % 1. Subdivised structure
 
 % Lists of subnodes and subelements that are created.
-[nodeList, elemList] = sdiv_struct(sdiv);
+SS = sdiv_struct(sdiv);
 
 % Plotting the subdivised structure, if desired.
 if contains(opts, 'p')
-	plot_struct(nodeList, elemList);
+	plot_sdiv_struct(SS.listNode, SS.listElem);
 end
 
 % 2. K_el and M_el
 
 % List of elementary K and M matrices, in local axes.
-[K_el, M_el] = set_el_list(elemList);
+[K_el, M_el] = set_el_list(SS.listElem);
 
 % 3. K_es and M_es
 
-[K_es, M_es] = set_es_list(elemList, K_el, M_el);
+[K_es, M_es] = set_es_list(SS.listElem, K_el, M_el);
 
 % 4. K and M
 
 % K_free and M_free.
-[K_free, M_free] = set_global_matrices(K_es, M_es);
+[K_free, M_free] = set_global_matrices(SS, K_es, M_es);
 
 % Apply boundary conditions to obtain K and M.
-% WARN: do not forget BCs and lumped nacelle mass.
-
-% 5. Boundary conditions
+% WARN: do not forget lumped nacelle mass.
 
 % 5. Solve the eigenvalue problem.
 % HINT: use eigs, with 'smallestabs' option.
@@ -59,26 +67,36 @@ end
 
 % 8. Total mass sanity check
 
+% 9. Save data into sdiv_struct.mat
+
+save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
+
 %% 1. Subdivised structure
 
-	function [nodeList, elemList] = sdiv_struct(sdiv)
+	function SS = sdiv_struct(sdiv)
 		% SDIV_STRUCT  Generate nodes and elements of the subdivised structure.
 		%
 		% Argument:
 		%	sdiv (int) -- Number of subsivisions desired.
-		% Returns:
-		%	nodeList {1xN Node} -- Cell of created nodes.
-		%	elemList {1xN Elem} -- Cell of created elements.
+		% Return:
+		%	SS (struct) with fields:
+		%		listNode {1xN Node} -- Cell list of nodes.
+		%		listElem {1xN Elem} -- Cell list of elements.
+		%		nbNode   (int)      -- Number of nodes.
+		%		nbElem   (int)      -- Number of elements.
+		%		nbDOF    (int)      -- Number of DOFs.
 
 		% Preallocate the node and element lists of the subdivised structure.
-		nodeList = cell(1, n_bnode + (sdiv-1)*n_belem);
-		elemList = cell(1, sdiv*n_belem);
-		% Prefill the nodeList with existing bare nodes.
-		nodeList(1: n_bnode) = BS.nodeList;
+		nbNode   = BS.nbNode + (sdiv-1)*BS.nbElem;
+		nbElem   = sdiv*BS.nbElem;
+		listNode = cell(1, nbNode);
+		listElem = cell(1, nbElem);
+		% Prefill the listNode with existing bare nodes.
+		listNode(1:BS.nbNode) = BS.listNode;
 
-		for i = 1:n_belem
+		for i = 1:BS.nbElem
 			% Extract element and extremity nodes (for terseness).
-			elem = BS.elemList{i};
+			elem = BS.listElem{i};
 			n1 = elem.n1;
 			n2 = elem.n2;
 			% Preallocate new subelements and subnodes.
@@ -103,32 +121,40 @@ end
 			for j = 1:numel(selem)
 				selem{j} = subLink(snode{j}, snode{j+1});
 			end
-			% Fill the nodeList and elemList.
-			nodeList(n_bnode + (i-1)*(numel(snode)-2) + (1:(numel(snode)-2))) = snode(2:end-1);
-			elemList((i-1)*(numel(selem)) + (1:numel(selem))) = selem;
+			% Fill the listNode and listElem.
+			% TODO: try to find a more readable way of doing this.
+			listNode(BS.nbNode + (i-1)*(numel(snode)-2) + (1:(numel(snode)-2))) = snode(2:end-1);
+			listElem((i-1)*(numel(selem)) + (1:numel(selem))) = selem;
 
 		end
+
+		% Build return data structure.
+		SS.listNode = listNode;
+		SS.listElem = listElem;
+		SS.nbNode   = nbNode;
+		SS.nbElem   = nbElem;
+		SS.nbDOF    = nbNode * Node.nbDOF;
 	end
 
-	function plot_struct(nl, el)
-		% PLOT_STRUCT  Get an overview of the structure.
+	function plot_sdiv_struct(listNode, listElem)
+		% PLOT_SDIV_STRUCT  Get an overview of the structure.
 		%
 		% Arguments:
-		%	nl {1xN Node} -- Cell of nodes.
-		%	el {1xN Elem} -- Cell of elements.
+		%	listNode {1xN Node} -- Cell list of nodes.
+		%	listElem {1xN Elem} -- Cell list of elements.
 
 		% Instantiate a figure object.
 		figure("WindowStyle", "docked");
 		hold on;
 		% Plot the nodes.
-		for node = nl(1:end)
+		for node = listNode(1:end)
 			if node{:}.pos(3) > C.f_height(end)  % ignone nacelle
 				continue
 			end
 			node{:}.plotNode()
 		end
 		% Plot the elements.
-		for elem = el(1:end)
+		for elem = listElem(1:end)
 			if elem{:}.n1.pos(3) > C.f_height(end) ...
 					|| elem{:}.n2.pos(3) > C.f_height(end)  % ignore nacelle
 				continue
@@ -150,7 +176,7 @@ end
 
 	% TODO: double check the K_el and M_el matrices.
 	function [K_el, M_el] = set_el_matrices(elem)
-		% SET_EL_MAT  Set the K and M elementary matrices, local axes.
+		% SET_EL_MATRICES  Set the elementary matrices, local axes.
 		%
 		% Argument:
 		%	elem (Elem) -- Structural element.
@@ -205,20 +231,20 @@ end
 			   0, -m(8),     0,    0,      0, -m(10),    0, -m(7),     0,    0,      0,   m(9)];
 	end
 
-	function [K_el, M_el] = set_el_list(elemList)
-		% SET_EL_LIST  Set all the K and M elementary matrices, local axes.
+	function [K_el, M_el] = set_el_list(listElem)
+		% SET_EL_LIST  Set all the elementary matrices, local axes.
 		%
 		% Argument:
-		%	elemList {1xN Elem} -- Cell of elements.
+		%	listElem {1xN Elem} -- Cell list of elements.
 		% Returns:
-		%	K_el {1xN (12x12 double)} -- Cell of K_el matrices.
-		%	M_el {1xN (12x12 double)} -- Cell of M_el matrices.
+		%	K_el {1xN (12x12 double)} -- Cell list of K_el matrices.
+		%	M_el {1xN (12x12 double)} -- Cell list of M_el matrices.
 
-		K_el = cell(1, numel(elemList));
-		M_el = cell(1, numel(elemList));
+		K_el = cell(1, numel(listElem));
+		M_el = cell(1, numel(listElem));
 
-		for i = 1:numel(elemList)
-			elem = elemList{i};
+		for i = 1:numel(listElem)
+			elem = listElem{i};
 			[K_el{i}, M_el{i}] = set_el_matrices(elem);
 		end
 	end
@@ -226,7 +252,7 @@ end
 %% 3. K_es and M_es
 
 	function [K_es, M_es] = set_es_matrices(elem, K_el, M_el)
-		% SET_ES_MAT  Set the K and M elementary matrices, structural axes.
+		% SET_ES_MATRICES  Set the elementary matrices, structural axes.
 		%
 		% Arguments:
 		%	elem (Elem)         -- Structural element.
@@ -258,32 +284,56 @@ end
         M_es = T' * M_el * T;
 	end
 
-	function [K_es, M_es] = set_es_list(elemList, K_el, M_el)
+	function [K_es, M_es] = set_es_list(listElem, K_el, M_el)
 		% SET_ES_LIST  Set all the K and M elementary matrices, structural axes.
 		%
 		% Arguments:
-		%	elemList {1xN Elem}           -- Cell of elements.
-		%	K_el     {1xN (12x12 double)} -- Cell of K_el matrices.
-		%	M_el     {1xN (12x12 double)} -- Cell of M_el matrices.
+		%	listElem {1xN Elem}           -- Cell list of elements.
+		%	K_el     {1xN (12x12 double)} -- Cell list of K_el matrices.
+		%	M_el     {1xN (12x12 double)} -- Cell list of M_el matrices.
 		% Returns:
-		%	K_es {1xN (12x12 double)} -- Cell of K_es matrices.
-		%	M_es {1xN (12x12 double)} -- Cell of M_es matrices.
+		%	K_es {1xN (12x12 double)} -- Cell list of K_es matrices.
+		%	M_es {1xN (12x12 double)} -- Cell list of M_es matrices.
 
-		K_es = cell(1, numel(elemList));
-		M_es = cell(1, numel(elemList));
+		K_es = cell(1, numel(listElem));
+		M_es = cell(1, numel(listElem));
 
-		for i = 1:numel(elemList)
-			[K_es{i}, M_es{i}] = set_es_matrices(elemList{i}, K_el{i}, M_el{i});
+		for i = 1:numel(listElem)
+			[K_es{i}, M_es{i}] = set_es_matrices(listElem{i}, K_el{i}, M_el{i});
 		end
 	end
 
 %% 4. K and M
 
-	function [K_free, M_free] = set_global_matrices(K_es, M_es)
-		
+	function [K_free, M_free] = set_global_matrices(SS, K_es, M_es)
+		% SET_GLOBAL_MATRICES  Set the global matrices of the free structure.
+		%
+		% Arguments:
+		%	SS   (struct)             -- Subdivised structure.
+		%	K_es {1xN (12x12 double)} -- Cell list of K_es matrices.
+		%	M_es {1xN (12x12 double)} -- Cell list of M_es matrices.
+		% Returns:
+		%	K_free  (nbDOFxnbDOF double) -- Global free stiffness matrix.
+		%	M_free  (nbDOFxnbDOF double) -- Global free mass      matrix.
+
+		K_free = zeros(SS.nbDOF);
+		M_free = zeros(SS.nbDOF);
+
+		for i = 1:SS.nbElem
+			locel = [SS.listElem{i}.n1.dof, SS.listElem{i}.n2.dof];
+			K_free(locel, locel) = K_free(locel, locel) + K_es{i};
+			M_free(locel, locel) = M_free(locel, locel) + M_es{i};
+		end
 	end
 
 	function [K, M] = apply_bc(K_free, M_free)
-
+		% APPLY_BC  Apply the boundary conditions.
+		%
+		% arguments:
+		%	K_free  (nbDOFxnbDOF double) -- Global free stiffness matrix.
+		%	M_free  (nbDOFxnbDOF double) -- Global free mass      matrix.
+		% Returns:
+		%	K (nbDOFxnbDOF double) -- Global stiffness matrix.
+		%	M (nbDOFxnbDOF double) -- Global mass      matrix.
 	end
 end
