@@ -1,21 +1,28 @@
-function MECA0029_Ernotte(sdiv, opts)
+function MECA0029_Ernotte(varargin)
 % MECA_0029_ERNOTTE  triggers all the code of the project.
 %
 % Arguments:
-%	sdiv: int, optional. Default is 3.
+%	sdiv (int) -- Optional, default is 3.
 %	  Number of subsivisions in the bare structure.
-%	opts: char {'p', 'w'}, optional. Default is 'p'.
+%	opts (char {'p', 'w'}) -- Optional, default is 'p'.
 %	  'p' -> Enable plots creation.
 %	  'w' -> Write plotting data in external file.
 
 %% Options setting
 
-if nargin == 0
-	sdiv = 3;
-	opts = 'p';
-elseif nargin == 1
-	opts = 'p';
+% Check number of inputs.
+if numel(varargin) > 2
+	error('At most 2 optional inputs are required');
 end
+
+% Set default value for optional inputs.
+optargs = {3, 'p'};
+
+% Overwrite default value of optional inputs.
+optargs(1:numel(varargin)) = varargin;
+
+% Place optional args in memorable variable names.
+[sdiv, opts] = optargs{:};
 
 %% Set program initial state
 

@@ -27,23 +27,35 @@ C = load(fullfile(file_dir, "../../res/constants.mat"));
 
 %% Nodes
 
-	function frame = elevate(h)
+	% TODO: find a more robust way to propagate default argument 'free'.
+	function frame = elevate(h, cstrList)
 		% ELEVATE  Create a frame of nodes, for the desired altitude.
 		%
-		% Argument: h     (double)   -- Altitude [m].
-		% Return:   frame {1x4 Node} -- Frame of nodes.
+		% Arguments:
+		%	h (double)
+		%		Altitude [m].
+		%	cstrList (1x4 Node.cstr) -- Optional, default is (1x4 "free").
+		%		Array of nodes constraint type.
+		% Return:
+		%	frame {1x4 Node}
+		%		Frame of nodes.
+
+		if nargin == 1
+			cstrList = repmat("free", 1, 4);
+		end
+
 		shift = tand(C.angle) * h;
 		frame = {
-			Node([          shift,           shift,  h]);
-			Node([C.b_width-shift,           shift,  h]);
-			Node([C.b_width-shift, C.b_width-shift,  h]);
-			Node([          shift, C.b_width-shift,  h])};
+			Node([          shift,           shift,  h], cstrList(1));
+			Node([C.b_width-shift,           shift,  h], cstrList(2));
+			Node([C.b_width-shift, C.b_width-shift,  h], cstrList(3));
+			Node([          shift, C.b_width-shift,  h], cstrList(4))};
 	end
 
 % Cell containing the 22 nodes of the bare structure.
 listNode = [
 	% The four horizontal frames.
-	elevate(C.f_height(1));
+	elevate(C.f_height(1), repmat("clamped", 1, 4));  % The base is clamped.
 	elevate(C.f_height(2));
 	elevate(C.f_height(3));
 	elevate(C.f_height(4));

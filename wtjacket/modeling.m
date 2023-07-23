@@ -33,7 +33,6 @@ BS = load(fullfile(file_dir, "../res/bare_struct.mat"));
 
 % 1. Subdivised structure
 
-% Lists of subnodes and subelements that are created.
 SS = sdiv_struct(sdiv);
 
 % Plotting the subdivised structure, if desired.
@@ -43,7 +42,6 @@ end
 
 % 2. K_el and M_el
 
-% List of elementary K and M matrices, in local axes.
 [K_el, M_el] = set_el_list(SS.listElem);
 
 % 3. K_es and M_es
@@ -53,13 +51,20 @@ end
 % 4. K and M
 
 % K_free and M_free.
+% WARN: do not forget lumped nacelle mass.
 [K_free, M_free] = set_global_matrices(SS, K_es, M_es);
 
-% Apply boundary conditions to obtain K and M.
-% WARN: do not forget lumped nacelle mass.
+% Apply boundary conditions.
+[K, M] = apply_bc(SS, K_free, M_free);
 
 % 5. Solve the eigenvalue problem.
-% HINT: use eigs, with 'smallestabs' option.
+
+[eigvals, eigmodes] = eigs(K, M, 8, 'smallestabs');
+
+% Extract natural frequencies, in Hertz.
+eigfreqs = sqrt(diag(eigvals)) / (2*pi);
+
+disp(eigfreqs);
 
 % 6. Eigenmodes plot
 
@@ -259,29 +264,31 @@ save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 		%	K_el (12x12 double) -- Stiffness elementary matrix, local axes.
 		%	M_el (12x12 double) -- Mass      elementary matrix, local axes.
 		% Returns:
-		%	K_el (12x12 double) -- Stiffness elementary matrix, structural axes.
-		%	M_el (12x12 double) -- Mass      elementary matrix, structural axes.
+		%	K_es (12x12 double) -- Stiffness elementary matrix, structural axes.
+		%	M_es (12x12 double) -- Mass      elementary matrix, structural axes.
 
 		% Build the local basis.
 		%
 		% Normalized x-axis directional vector of the local axes.
 		ex = elem.dir';
-		% WARN: see if left-hand bases are OK.
 		% Generate ey and ez by computing the null space of {ex, 0, 0}.
-		eyz = null([ex, zeros(3, 1), zeros(3, 1)]);
-		ey = eyz(:, 1);
-		ez = eyz(:, 2);
-		% WARN: verify if I should take the transpose.
+		nullspace = null([ex'; zeros(1, 3); zeros(1, 3)]);
+		ey = nullspace(:, 1);
+		ez = cross(ex, ey);  % Not nullspace(:,2), to ensure right-handedness.
 		lbasis = [ex, ey, ez];
 
 		% Transformation matrix between local and structural axes.
-		% The local basis happens to be the rotation operator, as the chosen
-		% structural basis is simply the identity matrix.
-		T = kron(eye(4), lbasis);
+		% The transpose local basis happens to be the rotation operator,
+		% as the chosen structural basis is simply the identity matrix.
+		T = kron(eye(4), lbasis');
 
 		% Applying the change of basis to K_el and M_el.
 		K_es = T' * K_el * T;
         M_es = T' * M_el * T;
+
+		% Sanity check: verify symmetry.
+% 		check_sym(K_es);
+% 		check_sym(M_es);
 	end
 
 	function [K_es, M_es] = set_es_list(listElem, K_el, M_el)
@@ -300,6 +307,7 @@ save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 
 		for i = 1:numel(listElem)
 			[K_es{i}, M_es{i}] = set_es_matrices(listElem{i}, K_el{i}, M_el{i});
+			disp(i);
 		end
 	end
 
@@ -324,16 +332,34 @@ save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 			K_free(locel, locel) = K_free(locel, locel) + K_es{i};
 			M_free(locel, locel) = M_free(locel, locel) + M_es{i};
 		end
+
+% 		check_sym(K_free);
+% 		check_sym(M_free);
 	end
 
-	function [K, M] = apply_bc(K_free, M_free)
+	function [K, M] = apply_bc(SS, K_free, M_free)
 		% APPLY_BC  Apply the boundary conditions.
 		%
 		% arguments:
-		%	K_free  (nbDOFxnbDOF double) -- Global free stiffness matrix.
-		%	M_free  (nbDOFxnbDOF double) -- Global free mass      matrix.
+		%	SS     (struct)             -- Subdivised structure.
+		%	K_free (nbDOFxnbDOF double) -- Global free stiffness matrix.
+		%	M_free (nbDOFxnbDOF double) -- Global free mass      matrix.
 		% Returns:
 		%	K (nbDOFxnbDOF double) -- Global stiffness matrix.
 		%	M (nbDOFxnbDOF double) -- Global mass      matrix.
+
+		% Supress rows and columns corresponding to clamped node DOFs.
+		for i = 1:SS.nbNode
+			node = SS.listNode{i};
+			if node.cstr == "clamped"
+				K_free(:, node.dof) = [];
+				M_free(:, node.dof) = [];
+				K_free(node.dof, :) = [];
+				M_free(node.dof, :) = [];
+			end
+		end
+
+		K = K_free;
+		M = M_free;
 	end
 end

@@ -19,7 +19,7 @@ classdef Elem
 	end
 
 	% NOTE:
-	% Cross-section area and inertia should be theoretically dependant, but
+	% Cross-section area and inertia should theoretically be dependant, but
 	% these properties need to be inconsistently overridden for the RigidLink
 	% class.
 	properties (Dependent)

@@ -1,14 +1,16 @@
 classdef Node
 	% NODE  Represent a 3D structural node.
 
-	properties (Constant)
-		nbDOF = 6;  % Number of DOFs of a node.
+	properties (Constant, Hidden)
+		nbDOF    = 6;                                 % Number of DOFs of a node.
+		cstrType = categorical(["free", "clamped"]);  % Possible constraints types.
 	end
 
 	properties
-		pos   (1, 3) double {mustBeReal}
-		label (1, 1) double {mustBeInteger}
-		dof   (1, 6) double {mustBeInteger}
+		pos   (1, 3) double {mustBeReal}     % Node coordinate, in structural axes.
+		label (1, 1) double {mustBeInteger}  % Label assigned to the Node.
+		dof   (1, 6) double {mustBeInteger}  % DOFs  assigned to the Node.
+		cstr  categorical                    % Constraints on the Node.
 	end
 
 	methods (Static)
@@ -38,10 +40,18 @@ classdef Node
 	end
 
 	methods
-		function node = Node(pos)
+		function node = Node(pos, cstr)
 			node.pos   = pos;
 			node.label = node.setLabel;
 			node.dof   = node.setDof;
+			if nargin == 1
+				node.cstr = Node.cstrType(1);  % Default 'free'
+			elseif nargin == 2
+				node.cstr = Node.cstrType(Node.cstrType == cstr);
+				if isempty(node.cstr)
+					error("'%s' is not a valid constraint type. Try 'free' or 'clamped'.", cstr);
+				end
+			end
 		end
 
 		function plotNode(node)
