@@ -10,7 +10,7 @@ classdef RigidLink < MainLink
 
 			rl = rl@MainLink(n1, n2);
 
-			rl.rho  = rl.rho  * 1e4;
+			rl.rho  = rl.rho  * 1e-4;
 			rl.E    = rl.E    * 1e4;
 			rl.area = rl.area * 1e-2;
 			rl.Iyy  = rl.Iyy  * 1e4;
