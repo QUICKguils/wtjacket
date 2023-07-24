@@ -272,7 +272,7 @@ save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 		% Normalized x-axis directional vector of the local axes.
 		ex = elem.dir';
 		% Generate ey and ez by computing the null space of {ex, 0, 0}.
-		nullspace = null([ex'; zeros(1, 3); zeros(1, 3)]);
+		nullspace = null(ex');
 		ey = nullspace(:, 1);
 		ez = cross(ex, ey);  % Not nullspace(:,2), to ensure right-handedness.
 		lbasis = [ex, ey, ez];
@@ -287,8 +287,8 @@ save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
         M_es = T' * M_el * T;
 
 		% Sanity check: verify symmetry.
-% 		check_sym(K_es);
-% 		check_sym(M_es);
+		check_sym(K_es);
+		check_sym(M_es);
 	end
 
 	function [K_es, M_es] = set_es_list(listElem, K_el, M_el)
@@ -333,8 +333,8 @@ save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 			M_free(locel, locel) = M_free(locel, locel) + M_es{i};
 		end
 
-% 		check_sym(K_free);
-% 		check_sym(M_free);
+		check_sym(K_free);
+		check_sym(M_free);
 	end
 
 	function [K, M] = apply_bc(SS, K_free, M_free)
