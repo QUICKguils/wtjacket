@@ -11,6 +11,6 @@ if nargin == 1
 end
 
 asym = max(mat-mat', [], "all");
-if asym < atol
+if asym > atol
 	warning(['Matrix ''' inputname(1) ''' is non-symmetric, but should be. (%g diff.)'], asym);
 end
