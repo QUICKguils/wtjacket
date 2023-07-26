@@ -50,7 +50,9 @@ BS = load(fullfile(root_dir, "res/bare_struct.mat"));
 modeling(sdiv, opts);
 
 % 2. Transient response.
+transient(opts);
 
 % 3. Reduction methods.
+reduction(opts);
 
 end

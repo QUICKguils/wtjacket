@@ -15,8 +15,9 @@ function modeling(sdiv, opts)
 %		nbElem   (int)      -- Number    of subdivised structure elements.
 %		nbDOF    (int)      -- Number    of subdivised structure DOFs.
 
-%% TODO
+%% TODO:
 
+% - Do not forget the lumped nacelle mass.
 % - Implement the write option.
 % - Tidy up shared variables and argument variables.
 
@@ -59,22 +60,26 @@ end
 
 % 5. Solve the eigenvalue problem.
 
-[eigvals, eigmodes] = eigs(K, M, 8, 'smallestabs');
-
-% Extract natural frequencies, in Hertz.
-eigfreqs = sqrt(diag(eigvals)) / (2*pi);
-
-disp(eigfreqs);
+SOL = get_solution(K, M, SS);
 
 % 6. Eigenmodes plot
 
+if contains(opts, 'p')
+	plot_vibration_mode(SS, SOL);
+end
+
 % 7. Convergence study
+
+% if contains(opts, 'p')
+% 	plot_convergence(SS);
+% end
 
 % 8. Total mass sanity check
 
 % 9. Save data into sdiv_struct.mat
 
 save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
+save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 
 %% 1. Subdivised structure
 
@@ -153,23 +158,23 @@ save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 		hold on;
 		% Plot the nodes.
 		for node = listNode(1:end)
-			if node{:}.pos(3) > C.f_height(end)  % ignone nacelle
+			if node{:}.pos(3) > C.frame_height(end)  % ignone nacelle
 				continue
 			end
 			node{:}.plotNode()
 		end
 		% Plot the elements.
 		for elem = listElem(1:end)
-			if elem{:}.n1.pos(3) > C.f_height(end) ...
-					|| elem{:}.n2.pos(3) > C.f_height(end)  % ignore nacelle
+			if elem{:}.n1.pos(3) > C.frame_height(end) ...
+					|| elem{:}.n2.pos(3) > C.frame_height(end)  % ignore nacelle
 				continue
 			end
 			elem{:}.plotElem()
 		end
 		% Dress the plot.
-		xlabel("X-coord. [m]");
-		ylabel("Y-coord. [m]");
-		zlabel("Z-coord. [m]");
+		xlabel("X/m");
+		ylabel("Y/m");
+		zlabel("Z/m");
 		title("Subdivised structure");
 		axis equal;
 		grid;
@@ -179,7 +184,6 @@ save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 
 %% 2. K_el and M_el
 
-	% TODO: double check the K_el and M_el matrices.
 	function [K_el, M_el] = set_el_matrices(elem)
 		% SET_EL_MATRICES  Set the elementary matrices, local axes.
 		%
@@ -307,7 +311,6 @@ save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 
 		for i = 1:numel(listElem)
 			[K_es{i}, M_es{i}] = set_es_matrices(listElem{i}, K_el{i}, M_el{i});
-			disp(i);
 		end
 	end
 
@@ -341,12 +344,12 @@ save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 		% APPLY_BC  Apply the boundary conditions.
 		%
 		% arguments:
-		%	SS     (struct)             -- Subdivised structure.
-		%	K_free (nbDOFxnbDOF double) -- Global free stiffness matrix.
-		%	M_free (nbDOFxnbDOF double) -- Global free mass      matrix.
+		%	SS     (struct)               -- Subdivised structure.
+		%	K_free (nbDOF x nbDOF double) -- Global free stiffness matrix.
+		%	M_free (nbDOF x nbDOF double) -- Global free mass      matrix.
 		% Returns:
-		%	K (nbDOFxnbDOF double) -- Global stiffness matrix.
-		%	M (nbDOFxnbDOF double) -- Global mass      matrix.
+		%	K (nbDOF x nbDOF double) -- Global stiffness matrix.
+		%	M (nbDOF x nbDOF double) -- Global mass      matrix.
 
 		% Supress rows and columns corresponding to clamped node DOFs.
 		for i = 1:SS.nbNode
@@ -362,4 +365,109 @@ save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 		K = K_free;
 		M = M_free;
 	end
+
+%% 5. Solve the eigenvalue problem
+
+	function SOL = get_solution(K, M, SS, nbMode)
+		% GET_SOLUTION  Get the natural frequencies and corresponding modes.
+		%
+		% Arguments:
+		%	K      (nbDOF x nbDOF double) -- Global stiffness matrix.
+		%	M      (nbDOF x nbDOF double) -- Global mass matrix.
+		%	SS     (struct)               -- Subdivised structure.
+		%	nbMode (int, default: 8)      -- Number of first modes desired.
+		% Returns:
+		%	SOL (struct) -- Solution of the vibration problem, with fields:
+		%	  modes  (nbDOF x nbMode double) -- Modal displacement vectors.
+		%	  freqs  (1 x nbMode)            -- Natural frequencies, in Hertz.
+		%	  nbMode (int)                   -- Number of computed modes.
+
+		% By default, the eight first modes are desired.
+		if nargin == 3
+			nbMode = 8;
+		end
+
+		% Find the first eigvecs and eigvals.
+		sigma = 1e3;
+		[eigvecs, eigvals] = eigs(K, M, nbMode, sigma);
+
+		% Extract the natural frequencies.
+		freqs = sqrt(diag(eigvals)) / (2*pi);
+
+		% Build modal displacements: add clamped nodes.
+		modes = zeros(SS.nbDOF, nbMode);
+		mask  = true(SS.nbDOF, 1);
+		for node = SS.listNode
+			if node{:}.cstr == "clamped"
+				mask(node{:}.dof) = false;
+			end
+		end
+		modes(mask, :) = eigvecs;
+
+		% Return data structure
+		SOL.freqs  = freqs;
+		SOL.modes  = modes;
+		SOL.nbMode = nbMode;
+	end
+
+%% 6. Eigenmodes plot
+
+	% TODO:
+	% - Use proper shape function to interpolate the displacement field.
+	% - Assert that size(modes) corresponds to numel(freqs) ?
+	function plot_vibration_mode(SS, SOL)
+		% PLOT_VIBRATION_MODE  Get an overview of the vibration modes.
+		%
+		% Arguments:
+		%	SS  (struct) -- Subdivised structure.
+		%	SOL (struct) -- Solution of the vibration problem.
+
+		figure("WindowStyle", "docked");
+
+		for i = 1:SOL.nbMode
+			subplot(2, 4, i);
+			hold on;
+
+			% Scale factor.
+			ref_length  = C.frame_height(end);
+			max_def     = max(SOL.modes(:, i));
+			percent_def = 10;
+			scale = ref_length/max_def * percent_def*1e-2;
+
+			% Plot the elements.
+			for elem = SS.listElem
+				elem{:}.plotElem();
+				x = [elem{:}.n1.pos(1) + scale * SOL.modes(elem{:}.n1.dof(1), i),...
+					 elem{:}.n2.pos(1) + scale * SOL.modes(elem{:}.n2.dof(1), i)];
+				y = [elem{:}.n1.pos(2) + scale * SOL.modes(elem{:}.n1.dof(2), i), ...
+					 elem{:}.n2.pos(2) + scale * SOL.modes(elem{:}.n2.dof(2), i)];
+				z = [elem{:}.n1.pos(3) + scale * SOL.modes(elem{:}.n1.dof(3), i), ...
+					 elem{:}.n2.pos(3) + scale * SOL.modes(elem{:}.n2.dof(3), i)];
+				plot3(x, y, z, Color=[0.9290 0.6940 0.1250], LineWidth=2);
+			end
+
+			% Dress the plot.
+			xlabel("X/m");
+			ylabel("Y/m");
+			zlabel("Z/m");
+			title(['f = ', num2str(SOL.freqs(i)), ' Hz']);
+			axis equal;
+			grid;
+			view([-0.75, -1, 4]);
+			hold off;
+		end
+	end
+
+%% 7. Convergence study
+
+	function plot_convergence(SS)
+		% PLOT_CONVERGENCE  Frequencies convergence w.r.t. nb. of elements.
+	end
+
+%% 8. Total mass sanity check
+
+	function check_mass(SOL)
+		%  CHECK_MASS  
+	end
+
 end
