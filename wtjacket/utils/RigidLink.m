@@ -1,8 +1,8 @@
 classdef RigidLink < MainLink
-		% RIGIDLINK  Represent a rigid link.
-		%   Rigid links are derived from main links. The material and
-		%   geometric parameters are set in such a way that the stiffness is
-		%   noticeably increased, thus behaving like a rigid link.
+	% RIGIDLINK  Represent a rigid link.
+	%	Rigid links are derived from main links. The material and
+	%	geometric parameters are set in such a way that the stiffness is
+	%	noticeably increased, thus behaving like a rigid link.
 
 	methods
 		function rl = RigidLink(n1, n2)
