@@ -56,7 +56,7 @@ classdef Node
 
 		function plotNode(node)
 			plot3(node.pos(1), node.pos(2), node.pos(3), ...
-				Color=[0.4940 0.1840 0.5560], Marker="*", MarkerSize=8, LineWidth=1.5);
+				Color=[0.4940 0.1840 0.5560], Marker=".", MarkerSize=15);
 		end
 	end
 end
