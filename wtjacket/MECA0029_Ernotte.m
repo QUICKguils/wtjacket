@@ -42,10 +42,6 @@ bare_struct(opts);
 
 %% Execute the code
 
-% Load project constants.
-C  = load(fullfile(root_dir, "res/constants.mat"));
-BS = load(fullfile(root_dir, "res/bare_struct.mat"));
-
 % 1. Modeling of the structure.
 modeling(sdiv, opts);
 

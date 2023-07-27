@@ -8,18 +8,24 @@ function modeling(sdiv, opts)
 %	  'p' -> Enable plots creation.
 %	  'w' -> Write plotting data in external file.
 % Save:
-%	SS (struct) with fields:
-%		listNode {1xN Node} -- Cell list of subdivised structure nodes.
-%		listElem {1xN Elem} -- Cell list of subdivised structure elements.
-%		nbNode   (int)      -- Number    of subdivised structure nodes.
-%		nbElem   (int)      -- Number    of subdivised structure elements.
-%		nbDOF    (int)      -- Number    of subdivised structure DOFs.
+%	SS (struct) -- Subdivised structure, with fields:
+%		listNode {1xN Node} -- Cell list of nodes.
+%		listElem {1xN Elem} -- Cell list of elements.
+%		nbNode   (int)      -- Number    of nodes.
+%		nbElem   (int)      -- Number    of elements.
+%		nbDOF    (int)      -- Number    of DOFs.
+%	SOL (struct) -- Solution of the vibration problem, with fields:
+%		modes  (nbDOF x nbMode double) -- Modal displacement vectors.
+%		freqs  (1 x nbMode)            -- Natural frequencies, in Hertz.
+%		nbMode (int)                   -- Number of computed modes.
 
 %% TODO:
 
 % - Do not forget the lumped nacelle mass.
+% - the first natural frequency should be close to the second.
 % - Implement the write option.
-% - Tidy up shared variables and argument variables.
+% - Tidy up shared variables and argument variables. (for ex; why BS is
+%   shared and not SS ?)
 
 %% Imports
 
@@ -68,15 +74,11 @@ if contains(opts, 'p')
 	plot_vibration_mode(SS, SOL);
 end
 
-% 7. Convergence study
+% 7. Total mass and sanity checks
 
-% if contains(opts, 'p')
-% 	plot_convergence(SS);
-% end
+% SOL.mass_rbm = rbm_checks(K_free, M_free, SS.nbNode);
 
-% 8. Total mass sanity check
-
-% 9. Save data into sdiv_struct.mat
+% 8. Save data.
 
 save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
@@ -201,7 +203,7 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 			 6*elem.E*elem.Iyy  / elem.length^2,  6*elem.E*elem.Izz / elem.length^2, ... % k(7), k(8)
 			12*elem.E*elem.Iyy  / elem.length^3, 12*elem.E*elem.Izz / elem.length^3];    % k(9), k(10)
 
-        % Elementary stiffness matrix in local axes [N/m].
+        % Elementary stiffness matrix in local axes.
 		 K_el = [
 			 k(1), 0,      0,     0,     0,     0,     -k(1), 0,      0,     0,     0,         0;
 			    0, k(10),  0,     0,     0,     k(8),  0,     -k(10), 0,     0,     0,      k(8);
@@ -224,7 +226,7 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 			 elem.length*11 / 210, elem.length*13 / 420,   ... % m(7), m(8)
 			  elem.length^2 / 105,  elem.length^2 / 140];      % m(9), m(10)
 
-		% Elementary mass matrix in local axes [kg].
+		% Elementary mass matrix in local axes.
 		M_el = elem.mass * [
 			m(3),     0,     0,    0,      0,      0, m(4),     0,     0,    0,      0,      0;
 			   0,  m(5),     0,    0,      0,   m(7),    0,  m(6),     0,    0,      0,  -m(8);
@@ -336,6 +338,14 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 			M_free(locel, locel) = M_free(locel, locel) + M_es{i};
 		end
 
+		% Add the nacelle inertia.
+		tr_dofs  = BS.listNode{end}.dof(1:3);
+		rot_dofs = BS.listNode{end}.dof(4:6);
+		tr_idx  = sub2ind(size(M_free), tr_dofs, tr_dofs);
+		rot_idx = sub2ind(size(M_free), rot_dofs, rot_dofs);
+		M_free(tr_idx)  = M_free(tr_idx) + C.nacelle_mass;
+		M_free(rot_idx) = M_free(rot_idx) + C.nacelle_inertia;
+
 		check_sym(K_free);
 		check_sym(M_free);
 	end
@@ -352,13 +362,12 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 		%	M (nbDOF x nbDOF double) -- Global mass      matrix.
 
 		% Supress rows and columns corresponding to clamped node DOFs.
-		for i = 1:SS.nbNode
-			node = SS.listNode{i};
-			if node.cstr == "clamped"
-				K_free(:, node.dof) = [];
-				M_free(:, node.dof) = [];
-				K_free(node.dof, :) = [];
-				M_free(node.dof, :) = [];
+		for node = SS.listNode
+			if node{:}.cstr == "clamped"
+				K_free(:, node{:}.dof) = [];
+				M_free(:, node{:}.dof) = [];
+				K_free(node{:}.dof, :) = [];
+				M_free(node{:}.dof, :) = [];
 			end
 		end
 
@@ -388,7 +397,7 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 		end
 
 		% Find the first eigvecs and eigvals.
-		sigma = 1e3;
+		sigma = 1e3;  % Could be advised to use a scalar value.
 		[eigvecs, eigvals] = eigs(K, M, nbMode, sigma);
 
 		% Extract the natural frequencies.
@@ -414,7 +423,7 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 
 	% TODO:
 	% - Use proper shape function to interpolate the displacement field.
-	% - Assert that size(modes) corresponds to numel(freqs) ?
+	% - The fifth mode do some funky stuff...
 	function plot_vibration_mode(SS, SOL)
 		% PLOT_VIBRATION_MODE  Get an overview of the vibration modes.
 		%
@@ -430,9 +439,10 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 
 			% Scale factor.
 			ref_length  = C.frame_height(end);
-			max_def     = max(SOL.modes(:, i));
-			percent_def = 10;
-			scale = ref_length/max_def * percent_def*1e-2;
+			mask        = reshape((1:3)' + Node.nbDOF * ((1:SS.nbNode)-1), 1, []);
+			max_def     = max(SOL.modes(mask, i));
+			percent_def = 15;
+			scale       = ref_length/max_def * percent_def*1e-2;
 
 			% Plot the elements.
 			for elem = SS.listElem
@@ -458,16 +468,42 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 		end
 	end
 
-%% 7. Convergence study
+%% 7. Total mass and sanity checks
 
-	function plot_convergence(SS)
-		% PLOT_CONVERGENCE  Frequencies convergence w.r.t. nb. of elements.
+	function varargout = rbm_checks(M_free, K_free, nbNode)
+		% RBM_CHECKS  Perform sanity checks based on rbm movement.
+		%
+		% This function uses a translation along the X-axis as a rigid
+		% body mode, to check that:
+		%   - the total mass of the structure is the same as the one calculated
+		%     with this RBM,
+		%   - the generalized forces required to maintain the structure in an
+		%     overall translational configuration is null.
+		%
+		% Arguments:
+		%	K_free (nbDOF x nbDOF double) -- Global free stiffness matrix.
+		%	M_free (nbDOF x nbDOF double) -- Global free mass      matrix.
+		%	nbNode (int)                  -- Number of structural nodes.
+		% Return:
+		%	mass_rbm (double, optional) -- Mass calculated from RBM [kg].
+
+		% Translation of 1m along the X-axis.
+		u_rbm = repmat([1, 0, 0, 0, 0, 0]', nbNode, 1);
+		disp(max(K_free * u_rbm));
+
+		% Mass calculated from this translation motion.
+		mass_rbm = u_rbm' * M_free * u_rbm;
+
+		% Sanity checks.
+		assert((mass_rbm-BS.mass)/BS.mass < 1e-2, ...
+			"RBM in translation yields to a wrong total mass calculation.");
+		assert(all(K_free * u_rbm < 1e-2), ...
+			"Forces required to translate along a RBM should be null.");
+
+		% Return mass_rbm, if wanted.
+		varargout = cell(nargout, 1);
+		for k = 1:nargout
+			varargout{k} = mass_rbm;
+		end
 	end
-
-%% 8. Total mass sanity check
-
-	function check_mass(SOL)
-		%  CHECK_MASS  
-	end
-
 end

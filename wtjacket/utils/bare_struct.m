@@ -27,7 +27,7 @@ C = load(fullfile(file_dir, "../../res/constants.mat"));
 
 %% Nodes
 
-	% TODO: find a more robust way to propagate default argument 'free'.
+% TODO: find a more robust way to propagate default argument 'free'.
 	function frame = elevate(h, cstrList)
 		% ELEVATE  Create a frame of nodes, for the desired altitude.
 		%
@@ -130,36 +130,20 @@ listElem = {
 	RigidLink(listNode{21}, listNode{22});
 	}';
 
+
+%% Total mass
+
+% Initialise the total mass of the bare structure [kg].
+mass = 0;
+% Account for the beams.
+for elem = listElem
+	mass = mass + elem{:}.mass;
+end
+% Account for the nacelle.
+mass = mass + C.nacelle_mass;
+
+
 %% Bare structure plot
-
-	function plot_bare_struct(listNode, listElem)
-		% PLOT_BARE_STRUCT  Get an overview of the bare structure.
-		%
-		% Arguments:
-		%	listNode {1xN Node} -- Cell list of nodes.
-		%	listElem {1xN Elem} -- Cell list of elements.
-
-		% Instantiate a figure object.
-		figure("WindowStyle", "docked");
-		hold on;
-		% Plot the nodes.
-		for node = listNode(1:end-1)  % ignore nacelle
-			node{:}.plotNode()
-		end
-		% Plot the elements.
-		for elem = listElem(1:end-1)  % ignore nacelle
-			elem{:}.plotElem()
-		end
-		% Dress the plot.
-		xlabel("X/m");
-		ylabel("Y/m");
-		zlabel("Z/m");
-		title("Bare structure");
-		axis equal;
-		grid;
-		view([-0.75, -1, 0.75]);
-		hold off;
-	end
 
 if contains(opts, 'p')
 	plot_bare_struct(listNode, listElem);
@@ -173,8 +157,38 @@ BS.listElem = listElem;
 BS.nbNode   = numel(listNode);
 BS.nbElem   = numel(listElem);
 BS.nbDOF    = BS.nbNode * Node.nbDOF;
+BS.mass     = mass;
 
 % Save data in bare_struct.mat, which lies in the /res directory.
 save(fullfile(file_dir, "../../res/bare_struct.mat"), "-struct", "BS");
 
+end
+
+function plot_bare_struct(listNode, listElem)
+% PLOT_BARE_STRUCT  Get an overview of the bare structure.
+%
+% Arguments:
+%	listNode {1xN Node} -- Cell list of nodes.
+%	listElem {1xN Elem} -- Cell list of elements.
+
+% Instantiate a figure object.
+figure("WindowStyle", "docked");
+hold on;
+% Plot the nodes.
+for node = listNode(1:end-1)  % ignore nacelle
+	node{:}.plotNode()
+end
+% Plot the elements.
+for elem = listElem(1:end-1)  % ignore nacelle
+	elem{:}.plotElem()
+end
+% Dress the plot.
+xlabel("X/m");
+ylabel("Y/m");
+zlabel("Z/m");
+title("Bare structure");
+axis equal;
+grid;
+view([-0.75, -1, 0.75]);
+hold off;
 end
