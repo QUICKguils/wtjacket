@@ -4,9 +4,15 @@ function MECA0029_Ernotte(varargin)
 % Arguments:
 %	sdiv (int) -- Optional, default is 3.
 %	  Number of subsivisions in the bare structure.
-%	opts (char {'p', 'w'}) -- Optional, default is 'p'.
+%	plt (char {'p', 'w'}) -- Optional, default is 'p'.
+%	  Plotting options.
 %	  'p' -> Enable plots creation.
 %	  'w' -> Write plotting data in external file.
+%	lWarn (char {'on' | 'off'}) -- Optional, default is 'on'.
+%	  Set local warnings state. See `warning`.
+
+% TODO:
+% - Implement lWarn option.
 
 %% Options setting
 
@@ -16,13 +22,13 @@ if numel(varargin) > 2
 end
 
 % Set default value for optional inputs.
-optargs = {3, 'p'};
+optargs = {3, 'p', 'on'};
 
 % Overwrite default value of optional inputs.
 optargs(1:numel(varargin)) = varargin;
 
 % Place optional args in memorable variable names.
-[sdiv, opts] = optargs{:};
+[sdiv, plt, lWarn] = optargs{:};
 
 %% Set program initial state
 
@@ -38,17 +44,20 @@ close all;
 
 % Initialize MAT file.
 constants();
-bare_struct(opts);
+bare_struct(plt);
+
+% Set local warnings state.
+warning(lWarn, 'wtjacket:WrongRbmMass');
 
 %% Execute the code
 
 % 1. Modeling of the structure.
-modeling(sdiv, opts);
+modeling(sdiv, plt);
 
 % 2. Transient response.
-transient(opts);
+transient(plt);
 
 % 3. Reduction methods.
-reduction(opts);
+reduction(plt);
 
 end

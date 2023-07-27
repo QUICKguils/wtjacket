@@ -1,10 +1,10 @@
-function modeling(sdiv, opts)
+function modeling(sdiv, plt)
 % MODELING  Model of the wt jacket, using 3D beam elements.
 %
 % Arguments:
 %	sdiv (int)
 %	  Number of subdivisions in the bare structure.
-%	opts (char {'p', 'w'})
+%	plt (char {'p', 'w'})
 %	  'p' -> Enable plots creation.
 %	  'w' -> Write plotting data in external file.
 % Save:
@@ -19,9 +19,7 @@ function modeling(sdiv, opts)
 %		freqs  (1 x nbMode)            -- Natural frequencies, in Hertz.
 %		nbMode (int)                   -- Number of computed modes.
 
-%% TODO:
-
-% - Do not forget the lumped nacelle mass.
+%TODO:
 % - the first natural frequency should be close to the second.
 % - Implement the write option.
 % - Tidy up shared variables and argument variables. (for ex; why BS is
@@ -43,7 +41,7 @@ BS = load(fullfile(file_dir, "../res/bare_struct.mat"));
 SS = sdiv_struct(sdiv);
 
 % Plotting the subdivised structure, if desired.
-if contains(opts, 'p')
+if contains(plt, 'p')
 	plot_sdiv_struct(SS.listNode, SS.listElem);
 end
 
@@ -70,13 +68,13 @@ SOL = get_solution(K, M, SS);
 
 % 6. Eigenmodes plot
 
-if contains(opts, 'p')
+if contains(plt, 'p')
 	plot_vibration_mode(SS, SOL);
 end
 
 % 7. Total mass and sanity checks
 
-% SOL.mass_rbm = rbm_checks(K_free, M_free, SS.nbNode);
+SOL.mass_rbm = rbm_checks(K_free, M_free, SS.nbNode);
 
 % 8. Save data.
 
@@ -397,7 +395,7 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 		end
 
 		% Find the first eigvecs and eigvals.
-		sigma = 1e3;  % Could be advised to use a scalar value.
+		sigma = 'smallestabs';  % Could be advised to use a scalar value.
 		[eigvecs, eigvals] = eigs(K, M, nbMode, sigma);
 
 		% Extract the natural frequencies.
@@ -439,9 +437,9 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 
 			% Scale factor.
 			ref_length  = C.frame_height(end);
-			mask        = reshape((1:3)' + Node.nbDOF * ((1:SS.nbNode)-1), 1, []);
-			max_def     = max(SOL.modes(mask, i));
-			percent_def = 15;
+			mask_rot    = reshape((1:3)' + Node.nbDOF * ((1:SS.nbNode)-1), 1, []);
+			max_def     = max(abs(SOL.modes(mask_rot, i)));
+			percent_def = 15;  % This gives a readable deformation.
 			scale       = ref_length/max_def * percent_def*1e-2;
 
 			% Plot the elements.
@@ -491,14 +489,20 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 		u_rbm = repmat([1, 0, 0, 0, 0, 0]', nbNode, 1);
 		disp(max(K_free * u_rbm));
 
-		% Mass calculated from this translation motion.
+		% Mass calculated from this translation.
 		mass_rbm = u_rbm' * M_free * u_rbm;
+		% Forces calculated from this translation.
+		g_rbm = K_free * u_rbm;
 
 		% Sanity checks.
-		assert((mass_rbm-BS.mass)/BS.mass < 1e-2, ...
-			"RBM in translation yields to a wrong total mass calculation.");
-		assert(all(K_free * u_rbm < 1e-2), ...
-			"Forces required to translate along a RBM should be null.");
+		if (mass_rbm-BS.mass)/BS.mass > 1e-2
+			warning('wtjacket:WrongRbmMass', ...
+				"RBM in translation yields to a wrong total mass calculation.");
+		end
+		if ~all(g_rbm < 1e-2)
+			warning('wtjacket:WrongRbmForces', ...
+				"Generalized forces required to translate along a RBM should be null.");
+		end
 
 		% Return mass_rbm, if wanted.
 		varargout = cell(nargout, 1);

@@ -12,7 +12,8 @@ end
 
 asym = max(mat-mat', [], "all");
 if asym > atol
-	warning(['Matrix ''' inputname(1) ''' is non-symmetric, but should be. (%g diff.)'], asym);
+	warning('wtjacket:ShouldBeSymmetric', ...
+		['Matrix ''' inputname(1) ''' is non-symmetric, but should be. (%g diff.)'], asym);
 end
 
 end
