@@ -8,11 +8,6 @@ function MECA0029_Ernotte(varargin)
 %	  Plotting options.
 %	  'p' -> Enable plots creation.
 %	  'w' -> Write plotting data in external file.
-%	lWarn (char {'on' | 'off'}) -- Optional, default is 'on'.
-%	  Set local warnings state. See `warning`.
-
-% TODO:
-% - Implement lWarn option.
 
 %% Options setting
 
@@ -22,13 +17,13 @@ if numel(varargin) > 2
 end
 
 % Set default value for optional inputs.
-optargs = {3, 'p', 'on'};
+optargs = {3, 'p'};
 
 % Overwrite default value of optional inputs.
 optargs(1:numel(varargin)) = varargin;
 
 % Place optional args in memorable variable names.
-[sdiv, plt, lWarn] = optargs{:};
+[sdiv, plt] = optargs{:};
 
 %% Set program initial state
 
@@ -45,9 +40,6 @@ close all;
 % Initialize MAT file.
 constants();
 bare_struct(plt);
-
-% Set local warnings state.
-warning(lWarn, 'wtjacket:WrongRbmMass');
 
 %% Execute the code
 

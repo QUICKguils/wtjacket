@@ -78,8 +78,16 @@ SOL.mass_rbm = rbm_checks(K_free, M_free, SS.nbNode);
 
 % 8. Save data.
 
+KM.K_el = K_el;
+KM.K_es = K_es;
+KM.K_free = K_free;
+KM.M_free = M_free;
+KM.K = K;
+KM.M = M;
+
 save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
 save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
+save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 
 %% 1. Subdivised structure
 
@@ -253,8 +261,7 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 		M_el = cell(1, numel(listElem));
 
 		for i = 1:numel(listElem)
-			elem = listElem{i};
-			[K_el{i}, M_el{i}] = set_el_matrices(elem);
+			[K_el{i}, M_el{i}] = set_el_matrices(listElem{i});
 		end
 	end
 
@@ -280,7 +287,7 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 		ey = nullspace(:, 1);
 		ez = cross(ex, ey);  % Not nullspace(:,2), to ensure right-handedness.
 		lbasis = [ex, ey, ez];
-
+		
 		% Transformation matrix between local and structural axes.
 		% The transpose local basis happens to be the rotation operator,
 		% as the chosen structural basis is simply the identity matrix.
@@ -360,14 +367,17 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 		%	M (nbDOF x nbDOF double) -- Global mass      matrix.
 
 		% Supress rows and columns corresponding to clamped node DOFs.
+		% PERF: listCstr is reallocated at each iteration.
+		listCstr = [];
 		for node = SS.listNode
 			if node{:}.cstr == "clamped"
-				K_free(:, node{:}.dof) = [];
-				M_free(:, node{:}.dof) = [];
-				K_free(node{:}.dof, :) = [];
-				M_free(node{:}.dof, :) = [];
+				listCstr = horzcat(listCstr, node{:}.dof);
 			end
 		end
+		K_free(:, listCstr) = [];
+		M_free(:, listCstr) = [];
+		K_free(listCstr, :) = [];
+		M_free(listCstr, :) = [];
 
 		K = K_free;
 		M = M_free;
@@ -431,30 +441,28 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 
 		figure("WindowStyle", "docked");
 
+		% Scale factor.
+		ref_length  = C.frame_height(end);
+		filter_tr   = reshape((1:3)' + Node.nbDOF * ((1:SS.nbNode)-1), 1, []);
+		max_def     = @(idxMode) max(abs(SOL.modes(filter_tr, idxMode)));
+		percent_def = 15;  % This gives a readable deformation.
+		scale       = @(idxMode) ref_length/max_def(idxMode) * percent_def*1e-2;
+
 		for i = 1:SOL.nbMode
 			subplot(2, 4, i);
 			hold on;
 
-			% Scale factor.
-			ref_length  = C.frame_height(end);
-			mask_rot    = reshape((1:3)' + Node.nbDOF * ((1:SS.nbNode)-1), 1, []);
-			max_def     = max(abs(SOL.modes(mask_rot, i)));
-			percent_def = 15;  % This gives a readable deformation.
-			scale       = ref_length/max_def * percent_def*1e-2;
-
-			% Plot the elements.
 			for elem = SS.listElem
 				elem{:}.plotElem();
-				x = [elem{:}.n1.pos(1) + scale * SOL.modes(elem{:}.n1.dof(1), i),...
-					 elem{:}.n2.pos(1) + scale * SOL.modes(elem{:}.n2.dof(1), i)];
-				y = [elem{:}.n1.pos(2) + scale * SOL.modes(elem{:}.n1.dof(2), i), ...
-					 elem{:}.n2.pos(2) + scale * SOL.modes(elem{:}.n2.dof(2), i)];
-				z = [elem{:}.n1.pos(3) + scale * SOL.modes(elem{:}.n1.dof(3), i), ...
-					 elem{:}.n2.pos(3) + scale * SOL.modes(elem{:}.n2.dof(3), i)];
+				x = [elem{:}.n1.pos(1) + scale(i) * SOL.modes(elem{:}.n1.dof(1), i),...
+					 elem{:}.n2.pos(1) + scale(i) * SOL.modes(elem{:}.n2.dof(1), i)];
+				y = [elem{:}.n1.pos(2) + scale(i) * SOL.modes(elem{:}.n1.dof(2), i), ...
+					 elem{:}.n2.pos(2) + scale(i) * SOL.modes(elem{:}.n2.dof(2), i)];
+				z = [elem{:}.n1.pos(3) + scale(i) * SOL.modes(elem{:}.n1.dof(3), i), ...
+					 elem{:}.n2.pos(3) + scale(i) * SOL.modes(elem{:}.n2.dof(3), i)];
 				plot3(x, y, z, Color=[0.9290 0.6940 0.1250], LineWidth=2);
 			end
 
-			% Dress the plot.
 			xlabel("X/m");
 			ylabel("Y/m");
 			zlabel("Z/m");
@@ -487,7 +495,6 @@ save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
 
 		% Translation of 1m along the X-axis.
 		u_rbm = repmat([1, 0, 0, 0, 0, 0]', nbNode, 1);
-		disp(max(K_free * u_rbm));
 
 		% Mass calculated from this translation.
 		mass_rbm = u_rbm' * M_free * u_rbm;
