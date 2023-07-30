@@ -27,7 +27,7 @@ C = load(fullfile(file_dir, "../../res/constants.mat"));
 
 %% Nodes
 
-% TODO: find a more robust way to propagate default argument 'free'.
+	% TODO: find a more robust way to propagate default argument 'free'.
 	function frame = elevate(h, cstrList)
 		% ELEVATE  Create a frame of nodes, for the desired altitude.
 		%

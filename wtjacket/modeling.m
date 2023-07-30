@@ -56,15 +56,17 @@ end
 % 4. K and M
 
 % K_free and M_free.
-% WARN: do not forget lumped nacelle mass.
 [K_free, M_free] = set_global_matrices(SS, K_es, M_es);
 
+% Gather the constrained DOFs in a bool indexing array.
+maskCstr = create_cstr_mask(SS);
+
 % Apply boundary conditions.
-[K, M] = apply_bc(SS, K_free, M_free);
+[K, M] = apply_bc(K_free, M_free, maskCstr);
 
 % 5. Solve the eigenvalue problem.
 
-SOL = get_solution(K, M, SS);
+SOL = get_solution(K, M, SS, maskCstr);
 
 % 6. Eigenmodes plot
 
@@ -355,29 +357,39 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		check_sym(M_free);
 	end
 
-	function [K, M] = apply_bc(SS, K_free, M_free)
+	function maskCstr = create_cstr_mask(SS)
+		% CREATE_CSTR_MASK  Create a bool array that index on constrained DOFs.
+		%
+		% Argument:
+		%	SS (struct) -- Subdivised structure.
+		% Return:
+		%	maskCstr (1 x nbDOF bool) -- Index on constrained DOFs.
+
+		maskCstr = false(1, SS.nbDOF);
+
+		for node = SS.listNode
+			if node{:}.cstr == "clamped"
+				maskCstr(node{:}.dof) = true;
+			end
+		end
+	end
+
+	function [K, M] = apply_bc(K_free, M_free, maskCstr)
 		% APPLY_BC  Apply the boundary conditions.
 		%
 		% arguments:
-		%	SS     (struct)               -- Subdivised structure.
-		%	K_free (nbDOF x nbDOF double) -- Global free stiffness matrix.
-		%	M_free (nbDOF x nbDOF double) -- Global free mass      matrix.
+		%	K_free   (nbDOF x nbDOF double) -- Global free stiffness matrix.
+		%	M_free   (nbDOF x nbDOF double) -- Global free mass matrix.
+		%	maskCstr (1 x nbDOF bool)       -- Index on constrained DOFs.
 		% Returns:
 		%	K (nbDOF x nbDOF double) -- Global stiffness matrix.
-		%	M (nbDOF x nbDOF double) -- Global mass      matrix.
+		%	M (nbDOF x nbDOF double) -- Global mass matrix.
 
 		% Supress rows and columns corresponding to clamped node DOFs.
-		% PERF: listCstr is reallocated at each iteration.
-		listCstr = [];
-		for node = SS.listNode
-			if node{:}.cstr == "clamped"
-				listCstr = horzcat(listCstr, node{:}.dof);
-			end
-		end
-		K_free(:, listCstr) = [];
-		M_free(:, listCstr) = [];
-		K_free(listCstr, :) = [];
-		M_free(listCstr, :) = [];
+		K_free(:, maskCstr) = [];
+		M_free(:, maskCstr) = [];
+		K_free(maskCstr, :) = [];
+		M_free(maskCstr, :) = [];
 
 		K = K_free;
 		M = M_free;
@@ -385,14 +397,15 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 
 %% 5. Solve the eigenvalue problem
 
-	function SOL = get_solution(K, M, SS, nbMode)
+	function SOL = get_solution(K, M, SS, maskCstr, nbMode)
 		% GET_SOLUTION  Get the natural frequencies and corresponding modes.
 		%
 		% Arguments:
-		%	K      (nbDOF x nbDOF double) -- Global stiffness matrix.
-		%	M      (nbDOF x nbDOF double) -- Global mass matrix.
-		%	SS     (struct)               -- Subdivised structure.
-		%	nbMode (int, default: 8)      -- Number of first modes desired.
+		%	K        (nbDOF x nbDOF double) -- Global stiffness matrix.
+		%	M        (nbDOF x nbDOF double) -- Global mass matrix.
+		%	SS       (struct)               -- Subdivised structure.
+		%	maskCstr (1 x nbDOF bool)       -- Index on constrained DOFs.
+		%	nbMode   (int, default: 8)      -- Number of first modes desired.
 		% Returns:
 		%	SOL (struct) -- Solution of the vibration problem, with fields:
 		%	  modes  (nbDOF x nbMode double) -- Modal displacement vectors.
@@ -400,7 +413,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		%	  nbMode (int)                   -- Number of computed modes.
 
 		% By default, the eight first modes are desired.
-		if nargin == 3
+		if nargin == 4
 			nbMode = 8;
 		end
 
@@ -413,13 +426,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 
 		% Build modal displacements: add clamped nodes.
 		modes = zeros(SS.nbDOF, nbMode);
-		mask  = true(SS.nbDOF, 1);
-		for node = SS.listNode
-			if node{:}.cstr == "clamped"
-				mask(node{:}.dof) = false;
-			end
-		end
-		modes(mask, :) = eigvecs;
+		modes(~maskCstr, :) = eigvecs;
 
 		% Return data structure
 		SOL.freqs  = freqs;
@@ -429,9 +436,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 
 %% 6. Eigenmodes plot
 
-	% TODO:
-	% - Use proper shape function to interpolate the displacement field.
-	% - The fifth mode do some funky stuff...
+	% TODO: Use proper shape function to interpolate the displacement field.
 	function plot_vibration_mode(SS, SOL)
 		% PLOT_VIBRATION_MODE  Get an overview of the vibration modes.
 		%
