@@ -15,12 +15,13 @@ C.nacelle_inertia = 24e6;               % Inertias of the nacelle [kg*m²].
 
 %% Transient response
 
-C.ship_mass       = 50e6;  % Mass of the ship [kg].
-C.ship_speed      = 0.25;  % Speed of the ship [m/s].
-C.impact_duration = 1;     % Duration of the impact [s].
-C.rem_momentum    = 0.8;   % Fraction of the remaining vs. initial momentum [-].
-C.force_angle     = 45;    % Angle of the force w.r.t. the X-axis [°].
-C.eps_s           = 0.03;  % Modal damping coefficient, for the eight first modes [-].
+C.impact_freq       = 1;         % Frequency of the resulting force on the jacket [Hz].
+C.tail_weight       = 1e3;       % Weight of one whale tail [kg].
+C.impact_speed      = 25 / 3.6;  % Velocity of the tail during the impact [m/s].
+C.impact_duration   = 0.05;      % Duration of the impact [s].
+C.momentum_transfer = 0.85;      % Proportion of the momentum transferred to the jacket [-].
+C.force_direction   = 45;        % Direction of the impact force, w.r.t. the X-axis.
+C.damping_ratio     = 5e-3;      % Damping ratio of the first two modes [-].
 
 %% Save data into constants.mat
 
