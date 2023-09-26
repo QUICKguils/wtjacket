@@ -1,4 +1,4 @@
-function MECA0029_Ernotte(varargin)
+function MECA0029_Group_3(varargin)
 % MECA_0029_ERNOTTE  triggers all the code of the project.
 %
 % Arguments:
