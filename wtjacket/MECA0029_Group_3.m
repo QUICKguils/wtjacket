@@ -32,7 +32,7 @@ root_dir = fullfile(fileparts(mfilename('fullpath')), "..");
 
 % Create the /res untracked file, if absent.
 res_dir = fullfile(root_dir, "/res");
-if ~exist(res_dir, dir)
+if ~exist(res_dir, 'dir')
 	mkdir(res_dir);
 end
 
