@@ -30,7 +30,13 @@ optargs(1:numel(varargin)) = varargin;
 % Find the root directory of the project.
 root_dir = fullfile(fileparts(mfilename('fullpath')), "..");
 
-% % Add resursively sub-directories in the Matlab path.
+% Create the /res untracked file, if absent.
+res_dir = fullfile(root_dir, "/res");
+if ~exist(res_dir, dir)
+	mkdir(res_dir);
+end
+
+% Add resursively sub-directories in the Matlab path.
 addpath(genpath(fullfile(root_dir, "wtjacket")));
 
 % Reset class internal states, close previous plots.
