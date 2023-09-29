@@ -64,7 +64,7 @@ maskCstr = create_cstr_mask(SS);
 % Apply boundary conditions.
 [K, M] = apply_bc(K_free, M_free, maskCstr);
 
-% 5. Solve the eigenvalue problem.
+% 5. Eigenvalue problem solving
 
 SOL = get_solution(K, M, SS, maskCstr);
 
@@ -78,7 +78,11 @@ end
 
 SOL.mass_rbm = rbm_checks(K_free, M_free, SS.nbNode);
 
-% 8. Save data.
+% 8. Convergence analysis
+
+analyze_convergence;
+
+% 9. Data saving
 
 KM.K_el = K_el;
 KM.K_es = K_es;
@@ -188,7 +192,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		title("Subdivised structure");
 		axis equal;
 		grid;
-		view([-0.75, -1, 0.75]);
+		view(-35, 40);
 		hold off;
 	end
 
@@ -299,7 +303,6 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		K_es = T' * K_el * T;
         M_es = T' * M_el * T;
 
-		% Sanity check: verify symmetry.
 		check_sym(K_es);
 		check_sym(M_es);
 	end
@@ -346,6 +349,8 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		end
 
 		% Add the nacelle inertia.
+		% TODO: not super robust to hardcode the nacelle index.
+		% FIX: nacelle mass weighting is probably false.
 		tr_dofs  = BS.listNode{end}.dof(1:3);
 		rot_dofs = BS.listNode{end}.dof(4:6);
 		tr_idx  = sub2ind(size(M_free), tr_dofs, tr_dofs);
@@ -428,7 +433,6 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		modes = zeros(SS.nbDOF, nbMode);
 		modes(~maskCstr, :) = eigvecs;
 
-		% Return data structure
 		SOL.freqs  = freqs;
 		SOL.modes  = modes;
 		SOL.nbMode = nbMode;
@@ -451,20 +455,21 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		filter_tr   = reshape((1:3)' + Node.nbDOF * ((1:SS.nbNode)-1), 1, []);
 		max_def     = @(idxMode) max(abs(SOL.modes(filter_tr, idxMode)));
 		percent_def = 15;  % This gives a readable deformation.
-		scale       = @(idxMode) ref_length/max_def(idxMode) * percent_def*1e-2;
+		get_scale   = @(idxMode) ref_length/max_def(idxMode) * percent_def*1e-2;
 
 		for i = 1:SOL.nbMode
 			subplot(2, 4, i);
 			hold on;
 
+			scale = get_scale(i);
 			for elem = SS.listElem
 				elem{:}.plotElem();
-				x = [elem{:}.n1.pos(1) + scale(i) * SOL.modes(elem{:}.n1.dof(1), i),...
-					 elem{:}.n2.pos(1) + scale(i) * SOL.modes(elem{:}.n2.dof(1), i)];
-				y = [elem{:}.n1.pos(2) + scale(i) * SOL.modes(elem{:}.n1.dof(2), i), ...
-					 elem{:}.n2.pos(2) + scale(i) * SOL.modes(elem{:}.n2.dof(2), i)];
-				z = [elem{:}.n1.pos(3) + scale(i) * SOL.modes(elem{:}.n1.dof(3), i), ...
-					 elem{:}.n2.pos(3) + scale(i) * SOL.modes(elem{:}.n2.dof(3), i)];
+				x = [elem{:}.n1.pos(1) + scale * SOL.modes(elem{:}.n1.dof(1), i),...
+					 elem{:}.n2.pos(1) + scale * SOL.modes(elem{:}.n2.dof(1), i)];
+				y = [elem{:}.n1.pos(2) + scale * SOL.modes(elem{:}.n1.dof(2), i), ...
+					 elem{:}.n2.pos(2) + scale * SOL.modes(elem{:}.n2.dof(2), i)];
+				z = [elem{:}.n1.pos(3) + scale * SOL.modes(elem{:}.n1.dof(3), i), ...
+					 elem{:}.n2.pos(3) + scale * SOL.modes(elem{:}.n2.dof(3), i)];
 				plot3(x, y, z, Color=[0.9290 0.6940 0.1250], LineWidth=2);
 			end
 
@@ -474,7 +479,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 			title(['f = ', num2str(SOL.freqs(i)), ' Hz']);
 			axis equal;
 			grid;
-			view([-0.75, -1, 4]);
+			view(-35, 50);
 			hold off;
 		end
 	end
@@ -507,7 +512,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		g_rbm = K_free * u_rbm;
 
 		% Sanity checks.
-		if (mass_rbm-BS.mass)/BS.mass > 1e-2
+		if abs((mass_rbm-BS.mass)/BS.mass) > 1e-2
 			warning('wtjacket:WrongRbmMass', ...
 				"RBM in translation yields to a wrong total mass calculation.");
 		end
@@ -522,4 +527,10 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 			varargout{k} = mass_rbm;
 		end
 	end
+
+%% 8. Convergence analysis
+
+	function analyze_convergence
+	end
+
 end

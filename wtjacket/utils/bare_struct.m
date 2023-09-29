@@ -27,7 +27,7 @@ C = load(fullfile(file_dir, "../../res/constants.mat"));
 
 %% Nodes
 
-	% TODO: find a more robust way to propagate default argument 'free'.
+% TODO: find a more robust way to propagate default argument 'free'.
 	function frame = elevate(h, cstrList)
 		% ELEVATE  Create a frame of nodes, for the desired altitude.
 		%
@@ -189,6 +189,6 @@ zlabel("Z/m");
 title("Bare structure");
 axis equal;
 grid;
-view([-0.75, -1, 0.75]);
+view(-35, 40);
 hold off;
 end
