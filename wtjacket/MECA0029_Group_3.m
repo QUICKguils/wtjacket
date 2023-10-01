@@ -1,5 +1,5 @@
 function MECA0029_Group_3(varargin)
-% MECA_0029_ERNOTTE  triggers all the code of the project.
+% MECA0029_Group_3  triggers all the code of the project.
 %
 % Arguments:
 %	sdiv (int) -- Optional, default is 3.
@@ -8,6 +8,14 @@ function MECA0029_Group_3(varargin)
 %	  Plotting options.
 %	  'p' -> Enable plots creation.
 %	  'w' -> Write plotting data in external file.
+
+% TODO:
+% - global variables in Node and Elem object are not very well handled.
+%   The correct generation of nodes and beam elements rely heavily on file
+%   execution order. It is MANDATORY to:
+%     1. clear Node and Elem objects.
+%     2. initialize MAT files (from constants and bare_struct).
+%     3. execute modeling
 
 %% Options setting
 
@@ -32,7 +40,7 @@ root_dir = fullfile(fileparts(mfilename('fullpath')), "..");
 
 % Create the /res untracked file, if absent.
 res_dir = fullfile(root_dir, "/res");
-if ~exist(res_dir, 'dir')
+if ~isfolder(res_dir)
 	mkdir(res_dir);
 end
 

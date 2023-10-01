@@ -20,8 +20,8 @@ function modeling(sdiv, plt)
 %		nbMode (int)                   -- Number of computed modes.
 
 %TODO:
-% - the first natural frequency should be close to the second.
-% - Implement the write option.
+% - Elementary matrices should be appended to the underlying element,
+%   and not defined in detached cell arrays that rely on synced indexing.
 % - Tidy up shared variables and argument variables. (for ex; why BS is
 %   shared and not SS ?)
 
@@ -78,14 +78,15 @@ end
 
 SOL.mass_rbm = rbm_checks(K_free, M_free, SS.nbNode);
 
-% 8. Convergence analysis
+% 8. Data saving
 
-analyze_convergence;
-
-% 9. Data saving
-
+% TODO: maybe remove el and es matrices, when fully debugged.
+% They are not useful for the following, and take a rather alrge amount
+% of space.
 KM.K_el = K_el;
+KM.M_el = M_el;
 KM.K_es = K_es;
+KM.M_es = M_es;
 KM.K_free = K_free;
 KM.M_free = M_free;
 KM.K = K;
@@ -350,7 +351,6 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 
 		% Add the nacelle inertia.
 		% TODO: not super robust to hardcode the nacelle index.
-		% FIX: nacelle mass weighting is probably false.
 		tr_dofs  = BS.listNode{end}.dof(1:3);
 		rot_dofs = BS.listNode{end}.dof(4:6);
 		tr_idx  = sub2ind(size(M_free), tr_dofs, tr_dofs);
@@ -463,7 +463,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 
 			scale = get_scale(i);
 			for elem = SS.listElem
-				elem{:}.plotElem();
+				elem{:}.plotElem();  % pass `'Color', [0, 0, 0, 0.2]` for better clarity.
 				x = [elem{:}.n1.pos(1) + scale * SOL.modes(elem{:}.n1.dof(1), i),...
 					 elem{:}.n2.pos(1) + scale * SOL.modes(elem{:}.n2.dof(1), i)];
 				y = [elem{:}.n1.pos(2) + scale * SOL.modes(elem{:}.n1.dof(2), i), ...
@@ -512,6 +512,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		g_rbm = K_free * u_rbm;
 
 		% Sanity checks.
+		% FIX: this is wrong
 		if abs((mass_rbm-BS.mass)/BS.mass) > 1e-2
 			warning('wtjacket:WrongRbmMass', ...
 				"RBM in translation yields to a wrong total mass calculation.");
@@ -520,17 +521,13 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 			warning('wtjacket:WrongRbmForces', ...
 				"Generalized forces required to translate along a RBM should be null.");
 		end
+		disp(mass_rbm);
 
 		% Return mass_rbm, if wanted.
 		varargout = cell(nargout, 1);
 		for k = 1:nargout
 			varargout{k} = mass_rbm;
 		end
-	end
-
-%% 8. Convergence analysis
-
-	function analyze_convergence
 	end
 
 end

@@ -2,9 +2,8 @@ function bare_struct(opts)
 % BARE_STRUCT  Definition of the wind turbine jacket structure.
 %
 % Argument:
-%	opts (char {'p', 'w'})
+%	opts (char {'p', ''})
 %	  'p' -> Enable plots creation.
-%	  'w' -> Write plotting data in external file.
 % Save:
 %	BS (struct) with fields:
 %		listNode {1xN Node} -- Cell list of bare structure nodes.
@@ -12,10 +11,6 @@ function bare_struct(opts)
 %		nbNode   (int)      -- Number    of bare structure nodes.
 %		nbElem   (int)      -- Number    of bare structure elements.
 %		nbDOF    (int)      -- Number    of bare structure DOFs.
-
-%% TODO
-
-% - Implement the write option.
 
 %% Imports
 
@@ -130,7 +125,6 @@ listElem = {
 	RigidLink(listNode{21}, listNode{22});
 	}';
 
-
 %% Total mass
 
 % Initialise the total mass of the bare structure [kg].
@@ -141,7 +135,6 @@ for elem = listElem
 end
 % Account for the nacelle.
 mass = mass + C.nacelle_mass;
-
 
 %% Bare structure plot
 
