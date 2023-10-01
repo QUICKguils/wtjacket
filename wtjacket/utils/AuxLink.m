@@ -11,8 +11,8 @@ classdef AuxLink < Elem
 			al = al@Elem(d, n1, n2);
 		end
 
-		function plotElem(al)
-			plotElem@Elem(al, Color=[0 0.4470 0.7410], LineWidth=1);
+		function plotElem(al, varargin)
+			plotElem@Elem(al, 'Color', [0 0.4470 0.7410], 'LineWidth', 1, varargin{:});
 		end
 	end
 end

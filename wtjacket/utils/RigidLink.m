@@ -19,8 +19,8 @@ classdef RigidLink < MainLink
 		end
 
 
-		function plotElem(rl)
-			plotElem@Elem(rl, Color=[0.4660 0.6740 0.1880], LineWidth=1.5);
+		function plotElem(rl, varargin)
+			plotElem@Elem(rl, 'Color', [0.4660 0.6740 0.1880], 'LineWidth', 1.5, varargin{:});
 		end
 	end
 end
