@@ -2,11 +2,34 @@ function modeling(sdiv, plt)
 % MODELING  Model of the wt jacket, using 3D beam elements.
 %
 % Arguments:
-%	sdiv (int)
-%	  Number of subdivisions in the bare structure.
-%	plt (char {'p', 'w'})
-%	  'p' -> Enable plots creation.
-%	  'w' -> Write plotting data in external file.
+%	sdiv (int)            -- Number of subdivisions in the bare structure.
+%	plt  (char {'p', ''}) -- 'p' -> Enable plots creation.
+
+prepare_fem_simulation(plt);
+run_fem_simulation(sdiv, plt);
+end
+
+function prepare_fem_simulation(plt)
+% PREPARE_FEM_SIMULATION  Set the FEM simulation initial state.
+%
+%	Argument:
+%	  plt (char {'p', ''}) -- 'p' -> Enable plots creation.
+
+% Reset class internal states, close previous plots.
+clear Node Elem
+close all;
+
+% Initialize MAT file.
+constants();
+bare_struct(plt);
+end
+
+function run_fem_simulation(sdiv, plt)
+% RUN_FEM_SIMULATION  Run a finite element method simulation.
+%
+% Arguments:
+%	sdiv (int)            -- Number of subdivisions in the bare structure.
+%	plt  (char {'p', ''}) -- 'p' -> Enable plots creation.
 % Save:
 %	SS (struct) -- Subdivised structure, with fields:
 %		listNode {1xN Node} -- Cell list of nodes.
@@ -529,5 +552,4 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 			varargout{k} = mass_rbm;
 		end
 	end
-
 end

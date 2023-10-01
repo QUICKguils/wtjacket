@@ -10,12 +10,7 @@ function MECA0029_Group_3(varargin)
 %	  'w' -> Write plotting data in external file.
 
 % TODO:
-% - global variables in Node and Elem object are not very well handled.
-%   The correct generation of nodes and beam elements rely heavily on file
-%   execution order. It is MANDATORY to:
-%     1. clear Node and Elem objects.
-%     2. initialize MAT files (from constants and bare_struct).
-%     3. execute modeling
+% - will the write option eventually be written ?
 
 %% Options setting
 
@@ -46,14 +41,6 @@ end
 
 % Add resursively sub-directories in the Matlab path.
 addpath(genpath(fullfile(root_dir, "wtjacket")));
-
-% Reset class internal states, close previous plots.
-clear Node Elem
-close all;
-
-% Initialize MAT file.
-constants();
-bare_struct(plt);
 
 %% Execute the code
 
