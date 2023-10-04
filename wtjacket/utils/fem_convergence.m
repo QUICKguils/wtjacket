@@ -8,7 +8,7 @@ function fem_convergence
 
 	% Directory where the present file lies.
 	file_dir = fileparts(mfilename("fullpath"));
-	% Results file.
+	% Results directory location.
 	res_file = (fullfile(file_dir, "../../res/"));
 
 	% Run the bare structure simulation once, if SOL data are not available.
@@ -28,13 +28,10 @@ function fem_convergence
 		freqs_serie(i, :) = SOL.freqs;
 	end
 
-	% Compute the relative differences between sdiv steps.
-	reldiffs = abs(diff(freqs_serie)./freqs_serie(2:end, :));
-
 	% Instantiate a figure object.
 	figure("WindowStyle", "docked");
 
-	% Plot frequencies w.r.t. sdiv.
+	% Plot frequencies.
 	subplot(1, 2, 1);
 	plot(sdiv_serie, freqs_serie);
 	title("Frequencies convergence");
@@ -42,11 +39,34 @@ function fem_convergence
 	ylabel("Natural frequency (Hz)");
 	grid;
 
-	% Plot relative differences w.r.t. sdiv.
+	% Plot relative differences w.r.t. the 8-th.
 	subplot(1, 2, 2);
-	semilogy(sdiv_serie(2:end), reldiffs);
+	reldiffs = abs(freqs_serie(1:end-1, :) - freqs_serie(end, :)) ./ freqs_serie(end, :);
+	semilogy(sdiv_serie(1:end-1), reldiffs);
 	title("Freqs reldiffs convergence");
 	xlabel("Number of sub-elements");
 	ylabel("Freqs relative difference");
 	grid;
+
+	% MAC matrix.
+
+end
+
+function NX = load_nx_sol
+	% LOAD_NX_SOL Load the solution found via the NX simulation.
+
+	NX.freq_1 = 4.481601E-01;
+	NX.freq_2 = 4.553358E-01;
+	NX.freq_3 = 9.845590E-01;
+	NX.freq_4 = 6.902199E+00;
+	NX.freq_5 = 7.350655E+00;
+	NX.freq_6 = 1.652662E+01;
+	NX.freq_7 = 1.985790E+01;
+
+	NX.mode_1 = 0 ;
+	NX.mode_2 = 0 ;
+	NX.mode_3 = 0 ;
+	NX.mode_4 = 0 ;
+	NX.mode_5 = 0 ;
+	NX.mode_6 = 0 ;
 end
