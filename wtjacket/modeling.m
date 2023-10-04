@@ -41,12 +41,15 @@ function run_fem_simulation(sdiv, plt)
 %		modes  (nbDOF x nbMode double) -- Modal displacement vectors.
 %		freqs  (1 x nbMode)            -- Natural frequencies, in Hertz.
 %		nbMode (int)                   -- Number of computed modes.
+%	KM (struct) -- Global structural matrices, with fields:
+%		KM.K_free (nbDOF x nbDOF) -- Global siffness matrix, without constraints.
+%		KM.M_free (nbDOF x nbDOF) -- Global mass     matrix, without constraints.
+%		KM.K      (N x N)         -- Global siffness matrix, with    constraints.
+%		KM.M      (N x N)         -- Global mass     matrix, with    constraints.
 
 %TODO:
-% - Elementary matrices should be appended to the underlying element,
-%   and not defined in detached cell arrays that rely on synced indexing.
-% - Tidy up shared variables and argument variables. (for ex; why BS is
-%   shared and not SS ?)
+% - Tidy up shared variables and argument variables.
+%   For example, why is BS shared and not SS ?
 
 %% Imports
 
@@ -68,18 +71,10 @@ if contains(plt, 'p')
 	plot_sdiv_struct(SS.listNode, SS.listElem);
 end
 
-% 2. K_el and M_el
-
-[K_el, M_el] = set_el_list(SS.listElem);
-
-% 3. K_es and M_es
-
-[K_es, M_es] = set_es_list(SS.listElem, K_el, M_el);
-
-% 4. K and M
+% 2. K and M
 
 % K_free and M_free.
-[K_free, M_free] = set_global_matrices(SS, K_es, M_es);
+[K_free, M_free] = set_global_matrices(SS);
 
 % Gather the constrained DOFs in a bool indexing array.
 maskCstr = create_cstr_mask(SS);
@@ -87,29 +82,22 @@ maskCstr = create_cstr_mask(SS);
 % Apply boundary conditions.
 [K, M] = apply_bc(K_free, M_free, maskCstr);
 
-% 5. Eigenvalue problem solving
+% 3. Eigenvalue problem solving
 
 SOL = get_solution(K, M, SS, maskCstr);
 
-% 6. Eigenmodes plot
+% 4. Eigenmodes plot
 
 if contains(plt, 'p')
 	plot_vibration_mode(SS, SOL);
 end
 
-% 7. Total mass and sanity checks
+% 5. Total mass and sanity checks
 
 SOL.mass_rbm = rbm_checks(K_free, M_free, SS.nbNode);
 
-% 8. Data saving
+% 6. Data saving
 
-% TODO: maybe remove el and es matrices, when fully debugged.
-% They are not useful for the following, and take a rather alrge amount
-% of space.
-KM.K_el = K_el;
-KM.M_el = M_el;
-KM.K_es = K_es;
-KM.M_es = M_es;
 KM.K_free = K_free;
 KM.M_free = M_free;
 KM.K = K;
@@ -220,139 +208,9 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		hold off;
 	end
 
-%% 2. K_el and M_el
+%% 2. K and M
 
-	function [K_el, M_el] = set_el_matrices(elem)
-		% SET_EL_MATRICES  Set the elementary matrices, local axes.
-		%
-		% Argument:
-		%	elem (Elem) -- Structural element.
-		% Returns:
-		%	K_el (12x12 double) -- Stiffness elementary matrix, local axes.
-		%	M_el (12x12 double) -- Mass      elementary matrix, local axes.
-		
-		% Pre-terms computation for stiffness matrix.
-		k = [
-			   elem.E*elem.area / elem.length,      elem.G*elem.Jx  / elem.length,   ... % k(1), k(2)
-			 2*elem.E*elem.Iyy  / elem.length,    2*elem.E*elem.Izz / elem.length,   ... % k(3), k(4)
-			 4*elem.E*elem.Iyy  / elem.length,    4*elem.E*elem.Izz / elem.length,   ... % k(5), k(6)
-			 6*elem.E*elem.Iyy  / elem.length^2,  6*elem.E*elem.Izz / elem.length^2, ... % k(7), k(8)
-			12*elem.E*elem.Iyy  / elem.length^3, 12*elem.E*elem.Izz / elem.length^3];    % k(9), k(10)
-
-        % Elementary stiffness matrix in local axes.
-		 K_el = [
-			 k(1), 0,      0,     0,     0,     0,     -k(1), 0,      0,     0,     0,         0;
-			    0, k(10),  0,     0,     0,     k(8),  0,     -k(10), 0,     0,     0,      k(8);
-			    0, 0,      k(9),  0,     -k(7), 0,     0,     0,      -k(9), 0,     -k(7),     0;
-			    0, 0,      0,     k(2),  0,     0,     0,     0,      0,     -k(2), 0,         0;
-			    0, 0,      -k(7), 0,     k(5),  0,     0,     0,      k(7),  0,     k(3),      0;
-			    0, k(8),   0,     0,     0,     k(6),  0,     -k(8),  0,     0,     0,      k(4);
-			-k(1), 0,      0,     0,     0,     0,     k(1),  0,      0,     0,     0,         0;
-			    0, -k(10), 0,     0,     0,     -k(8), 0,     k(10),  0,     0,     0,     -k(8);
-			    0, 0,      -k(9), 0,     k(7),  0,     0,     0,      k(9),  0,     k(7),      0;
-			    0, 0,      0,     -k(2), 0,     0,     0,     0,      0,     k(2),  0,         0;
-			    0, 0,      -k(7), 0,     k(3),  0,     0,     0,      k(7),  0,     k(5),      0;
-			    0, k(8),   0,     0,     0,     k(4),  0,     -k(8),  0,     0,     0,      k(6)];
-
-		% Pre-terms computation for stiffness matrix.
-		m = [
-			     (elem.d/2)^2 / 3,     (elem.d/2)^2 / 6,   ... % m(1), m(2)
-			                1 / 3,                1 / 6,   ... % m(3), m(4)
-			              13 / 35,               9 / 70,   ... % m(5), m(6)
-			 elem.length*11 / 210, elem.length*13 / 420,   ... % m(7), m(8)
-			  elem.length^2 / 105,  elem.length^2 / 140];      % m(9), m(10)
-
-		% Elementary mass matrix in local axes.
-		M_el = elem.mass * [
-			m(3),     0,     0,    0,      0,      0, m(4),     0,     0,    0,      0,      0;
-			   0,  m(5),     0,    0,      0,   m(7),    0,  m(6),     0,    0,      0,  -m(8);
-			   0,     0,  m(5),    0,  -m(7),      0,    0,     0,  m(6),    0,   m(8),      0;
-			   0,     0,     0, m(1),      0,      0,    0,     0,     0, m(2),      0,      0;
-			   0,     0, -m(7),    0,   m(9),      0,    0,     0, -m(8),    0, -m(10),      0;
-			   0,  m(7),     0,    0,      0,   m(9),    0,  m(8),     0,    0,      0, -m(10);
-			m(4),     0,     0,    0,      0,      0, m(3),     0,     0,    0,      0,      0;
-			   0,  m(6),     0,    0,      0,   m(8),    0,  m(5),     0,    0,      0,  -m(7);
-			   0,     0,  m(6),    0,  -m(8),      0,    0,     0,  m(5),    0,   m(7),      0;
-			   0,     0,     0, m(2),      0,      0,    0,     0,     0, m(1),      0,      0;
-			   0,     0,  m(8),    0, -m(10),      0,    0,     0,  m(7),    0,   m(9),      0;
-			   0, -m(8),     0,    0,      0, -m(10),    0, -m(7),     0,    0,      0,   m(9)];
-	end
-
-	function [K_el, M_el] = set_el_list(listElem)
-		% SET_EL_LIST  Set all the elementary matrices, local axes.
-		%
-		% Argument:
-		%	listElem {1xN Elem} -- Cell list of elements.
-		% Returns:
-		%	K_el {1xN (12x12 double)} -- Cell list of K_el matrices.
-		%	M_el {1xN (12x12 double)} -- Cell list of M_el matrices.
-
-		K_el = cell(1, numel(listElem));
-		M_el = cell(1, numel(listElem));
-
-		for i = 1:numel(listElem)
-			[K_el{i}, M_el{i}] = set_el_matrices(listElem{i});
-		end
-	end
-
-%% 3. K_es and M_es
-
-	function [K_es, M_es] = set_es_matrices(elem, K_el, M_el)
-		% SET_ES_MATRICES  Set the elementary matrices, structural axes.
-		%
-		% Arguments:
-		%	elem (Elem)         -- Structural element.
-		%	K_el (12x12 double) -- Stiffness elementary matrix, local axes.
-		%	M_el (12x12 double) -- Mass      elementary matrix, local axes.
-		% Returns:
-		%	K_es (12x12 double) -- Stiffness elementary matrix, structural axes.
-		%	M_es (12x12 double) -- Mass      elementary matrix, structural axes.
-
-		% Build the local basis.
-		%
-		% Normalized x-axis directional vector of the local axes.
-		ex = elem.dir';
-		% Generate ey and ez by computing the null space of {ex, 0, 0}.
-		nullspace = null(ex');
-		ey = nullspace(:, 1);
-		ez = cross(ex, ey);  % Not nullspace(:,2), to ensure right-handedness.
-		lbasis = [ex, ey, ez];
-		
-		% Transformation matrix between local and structural axes.
-		% The transpose local basis happens to be the rotation operator,
-		% as the chosen structural basis is simply the identity matrix.
-		T = kron(eye(4), lbasis');
-
-		% Applying the change of basis to K_el and M_el.
-		K_es = T' * K_el * T;
-        M_es = T' * M_el * T;
-
-		check_sym(K_es);
-		check_sym(M_es);
-	end
-
-	function [K_es, M_es] = set_es_list(listElem, K_el, M_el)
-		% SET_ES_LIST  Set all the K and M elementary matrices, structural axes.
-		%
-		% Arguments:
-		%	listElem {1xN Elem}           -- Cell list of elements.
-		%	K_el     {1xN (12x12 double)} -- Cell list of K_el matrices.
-		%	M_el     {1xN (12x12 double)} -- Cell list of M_el matrices.
-		% Returns:
-		%	K_es {1xN (12x12 double)} -- Cell list of K_es matrices.
-		%	M_es {1xN (12x12 double)} -- Cell list of M_es matrices.
-
-		K_es = cell(1, numel(listElem));
-		M_es = cell(1, numel(listElem));
-
-		for i = 1:numel(listElem)
-			[K_es{i}, M_es{i}] = set_es_matrices(listElem{i}, K_el{i}, M_el{i});
-		end
-	end
-
-%% 4. K and M
-
-	function [K_free, M_free] = set_global_matrices(SS, K_es, M_es)
+	function [K_free, M_free] = set_global_matrices(SS)
 		% SET_GLOBAL_MATRICES  Set the global matrices of the free structure.
 		%
 		% Arguments:
@@ -366,10 +224,10 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		K_free = zeros(SS.nbDOF);
 		M_free = zeros(SS.nbDOF);
 
-		for i = 1:SS.nbElem
-			locel = [SS.listElem{i}.n1.dof, SS.listElem{i}.n2.dof];
-			K_free(locel, locel) = K_free(locel, locel) + K_es{i};
-			M_free(locel, locel) = M_free(locel, locel) + M_es{i};
+		for elem = SS.listElem
+			locel = [elem{:}.n1.dof, elem{:}.n2.dof];
+			K_free(locel, locel) = K_free(locel, locel) + elem{:}.K_es;
+			M_free(locel, locel) = M_free(locel, locel) + elem{:}.M_es;
 		end
 
 		% Add the nacelle inertia.
@@ -423,7 +281,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		M = M_free;
 	end
 
-%% 5. Solve the eigenvalue problem
+%% 3. Solve the eigenvalue problem
 
 	function SOL = get_solution(K, M, SS, maskCstr, nbMode)
 		% GET_SOLUTION  Get the natural frequencies and corresponding modes.
@@ -446,7 +304,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		end
 
 		% Find the first eigvecs and eigvals.
-		sigma = 'smallestabs';  % Could be advised to use a scalar value.
+		sigma = 0.4; % 'smallestabs';  % Could be advised to use a scalar value.
 		[eigvecs, eigvals] = eigs(K, M, nbMode, sigma);
 
 		% Extract the natural frequencies.
@@ -461,7 +319,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		SOL.nbMode = nbMode;
 	end
 
-%% 6. Eigenmodes plot
+%% 4. Eigenmodes plot
 
 	% TODO: Use proper shape function to interpolate the displacement field.
 	function plot_vibration_mode(SS, SOL)
@@ -507,7 +365,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		end
 	end
 
-%% 7. Total mass and sanity checks
+%% 5. Total mass and sanity checks
 
 	function varargout = rbm_checks(M_free, K_free, nbNode)
 		% RBM_CHECKS  Perform sanity checks based on rbm movement.
@@ -530,12 +388,12 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		u_rbm = repmat([1, 0, 0, 0, 0, 0]', nbNode, 1);
 
 		% Mass calculated from this translation.
+		% FIX: this is wrong: generalized masses are defined to a constant.
 		mass_rbm = u_rbm' * M_free * u_rbm;
 		% Forces calculated from this translation.
 		g_rbm = K_free * u_rbm;
 
 		% Sanity checks.
-		% FIX: this is wrong
 		if abs((mass_rbm-BS.mass)/BS.mass) > 1e-2
 			warning('wtjacket:WrongRbmMass', ...
 				"RBM in translation yields to a wrong total mass calculation.");
