@@ -16,26 +16,65 @@ function fem_convergence
 		modeling(1, '');
 	end
 	SOL = load(fullfile(res_file, "modeling_sol.mat"));
+    BS = load(fullfile(res_file, "bare_struct.mat"));
+    
 
 	% Desired sdiv sequence.
-	sdiv_serie = 1:8;
+	sdiv_serie = 1:9;
+    
 	freqs_serie = zeros(numel(sdiv_serie), SOL.nbMode);
-
+    modes_serie = zeros(numel(sdiv_serie), BS.nbDOF, SOL.nbMode);
+    
 	% Gather the frequencies for the desired subdivisions.
 	for i = 1:numel(sdiv_serie)
 		modeling(sdiv_serie(i), '');
 		SOL = load("res\modeling_sol.mat");
 		freqs_serie(i, :) = SOL.freqs;
-	end
-
+        for d = 1:BS.nbDOF
+            modes_serie(i, d, :) = SOL.modes(d,:);
+		end
+    end
+    
 	% Compute the relative differences between sdiv steps.
 	reldiffs = abs(diff(freqs_serie)./freqs_serie(2:end, :));
+    
+    % Compute the relative differences between modes amplitudes
+    mode_diff = zeros(numel(sdiv_serie)-1, BS.nbDOF, SOL.nbMode);
+    norm_mode_diff = zeros(numel(sdiv_serie)-1, SOL.nbMode);
 
-	% Instantiate a figure object.
+    for i = 1:numel(sdiv_serie)-1
+        mode_diff(i, :, :) = abs(modes_serie(i+1, :, :) -  modes_serie(i, :, :));
+        for m = 1:SOL.nbMode
+            norm_mode_diff(i,m) = norm(mode_diff(i, :, m));
+        end
+    end
+    
+    % MAC
+    
+    % this section computes the MAC for each successive mode
+    MAC_arr = zeros(numel(sdiv_serie)-1, SOL.nbMode, SOL.nbMode);
+    
+    for i = 1:numel(sdiv_serie)-1
+        MAC_arr(i, :, :) = MAC(modes_serie(i, :, :), modes_serie(i+1, :, :), SOL);
+    end
+    
+    % NOTE pretty certain MAC(mi, mi+1) should converge to eye(nbMode)
+    % if modes do converge ?
+
+    % Instantiate a figure object.
 	figure("WindowStyle", "docked");
-
+    
+    % Plot of MAC convergence
+    for i = 1:numel(sdiv_serie)-1
+        subplot(1, numel(sdiv_serie), i);
+        image(reshape(MAC_arr(i,:,:), SOL.nbMode, SOL.nbMode) ,'CDataMapping','scaled')
+        colorbar
+    end
+    
+    % Frequencies convergence
+    figure("WindowStyle", "docked");
 	% Plot frequencies w.r.t. sdiv.
-	subplot(1, 2, 1);
+	subplot(1, 3, 1);
 	plot(sdiv_serie, freqs_serie);
 	title("Frequencies convergence");
 	xlabel("Number of sub-elements");
@@ -43,10 +82,43 @@ function fem_convergence
 	grid;
 
 	% Plot relative differences w.r.t. sdiv.
-	subplot(1, 2, 2);
+	subplot(1, 3, 2);
 	semilogy(sdiv_serie(2:end), reldiffs);
 	title("Freqs reldiffs convergence");
 	xlabel("Number of sub-elements");
 	ylabel("Freqs relative difference");
 	grid;
+    
+    % Mode convergence
+    subplot(1, 3, 3);
+	plot(sdiv_serie(2:end), norm_mode_diff);
+	title("Mode L2 norm convergence");
+	xlabel("Number of sub-elements");
+	ylabel("Relative difference mode norm");
+	grid;
 end
+
+ function mac = MAC(m1, m2, SOL)
+    % MAC Compute Modal Assurance Criterion
+    %
+    % Arguments
+    %   m1   1 x nbMode x nbDOF
+    %   m2   1 x nbMode x nbDOF
+    %
+    % Returns
+    %   mac  nbMode x nbMode
+    
+    % mac(m1, m2)[i][j] = ( (m1[i]' * m2[j]) / (|m1| * |m2|) )^2
+    mac = zeros(SOL.nbMode, SOL.nbMode);
+    for i = 1:SOL.nbMode
+        for j = 1:SOL.nbMode
+
+            norm_m1 = norm(m1(1, :, i));
+            norm_m2 = norm(m2(1, :, j));
+
+            mac(i,j) = (1 / (norm_m1 * norm_m2) * m1(1, :, i) * m2(1, :, j)').^2;
+        end
+    end
+ end
+ 
+    
