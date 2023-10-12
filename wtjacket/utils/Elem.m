@@ -43,8 +43,8 @@ classdef Elem
 				elem.n1  = n1;
 				elem.n2  = n2;
 
-				elem.area = pi * elem.d * elem.w_thick;
-				elem.Iyy = pi * ((elem.d+elem.w_thick)^4-(elem.d-elem.w_thick)^4)/64;
+				elem.area = pi * elem.w_thick * (elem.d - elem.w_thick);
+				elem.Iyy = pi * (elem.d^4 - (elem.d - 2*elem.w_thick)^4) / 64;
 				elem.Izz = elem.Iyy;
 				elem.Jx = elem.Iyy + elem.Izz;
 			end
@@ -93,12 +93,14 @@ classdef Elem
 
 		function M_el = get.M_el(elem)
 			% Pre-terms computation for stiffness matrix.
+			% TODO: make sure of m(1) and m(2).
 			m = [
-				   (elem.d/2)^2 / 3,      (elem.d/2)^2 / 6,   ... % m(1), m(2)
-				              1 / 3,                 1 / 6,   ... % m(3), m(4)
-				            13 / 35,                9 / 70,   ... % m(5), m(6)
-				elem.length*11 / 210, elem.length*13 / 420,   ... % m(7), m(8)
-				 elem.length^2 / 105,  elem.length^2 / 140];      % m(9), m(10)
+				(elem.w_thick*(elem.d-elem.w_thick)) / 3,   ... % m(1)
+				(elem.w_thick*(elem.d-elem.w_thick)) / 6,   ... % m(2)
+				              1 / 3,                 1 / 6, ... % m(3), m(4)
+				            13 / 35,                9 / 70, ... % m(5), m(6)
+				elem.length*11 / 210, elem.length*13 / 420, ... % m(7), m(8)
+				 elem.length^2 / 105,  elem.length^2 / 140];    % m(9), m(10)
 
 			% Elementary mass matrix in local axes.
 			M_el = elem.mass * [
@@ -138,20 +140,25 @@ classdef Elem
 			%
 			% Arguments:
 			%	elem (Elem)         -- Structural element.
-			%	K_el (12x12 double) -- Stiffness elementary matrix, local axes.
-			%	M_el (12x12 double) -- Mass      elementary matrix, local axes.
+			%	lmat (12x12 double) -- Elementary matrix in local axes.
 			% Returns:
-			%	K_es (12x12 double) -- Stiffness elementary matrix, structural axes.
-			%	M_es (12x12 double) -- Mass      elementary matrix, structural axes.
+			%	smat (12x12 double) -- Elementary matrix in structural axes.
 
 			% Build the local basis.
 			%
-			% Normalized x-axis directional vector of the local axes.
+			% Longitudinal axis: `ex`.
 			ex = elem.dir';
-			% Generate ey and ez by computing the null space of {ex, 0, 0}.
-			nullspace = null(ex');
-			ey = nullspace(:, 1);
-			ez = cross(ex, ey);  % Not nullspace(:,2), to ensure right-handedness.
+			% Choose a reference direction: `ref_dir`.
+			% This reference direction is defined as one of the three vectors
+			% of the structural base, so that it is not aligned with `ex`.
+			[~, ref_comp] = min(abs(ex));
+			ref_dir = zeros(size(ex));
+			ref_dir(ref_comp) = 1;
+			% Other axes are then simply constructed via cross products.
+			ey_dir = cross(ex, ref_dir);
+			ey = ey_dir / norm(ey_dir);
+			ez = cross(ex, ey);
+			% Local basis.
 			lbasis = [ex, ey, ez];
 
 			% Transformation matrix between local and structural axes.
@@ -162,7 +169,8 @@ classdef Elem
 			% Applying the change of basis to K_el and M_el.
 			smat = T' * lmat * T;
 
-			check_sym(smat);
+			% Check that `smat` remains symmetric enough.
+			allclose(smat, smat');
 		end
 	end
 end

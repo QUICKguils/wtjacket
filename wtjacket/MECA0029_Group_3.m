@@ -2,15 +2,11 @@ function MECA0029_Group_3(varargin)
 % MECA0029_Group_3  triggers all the code of the project.
 %
 % Arguments:
-%	sdiv (int) -- Optional, default is 3.
-%	  Number of subsivisions in the bare structure.
-%	plt (char {'p', 'w'}) -- Optional, default is 'p'.
-%	  Plotting options.
+%	sdiv (int, default: 3)        -- Number of subsivisions in the bare structure.
+%	opts (1xN char, default: 'p') -- Options.
+%	  ''  -> No options.
 %	  'p' -> Enable plots creation.
-%	  'w' -> Write plotting data in external file.
-
-% TODO:
-% - will the write option eventually be written ?
+%	  'w' -> Enable warnings.
 
 %% Options setting
 
@@ -26,7 +22,7 @@ optargs = {3, 'p'};
 optargs(1:numel(varargin)) = varargin;
 
 % Place optional args in memorable variable names.
-[sdiv, plt] = optargs{:};
+[sdiv, opts] = optargs{:};
 
 %% Set program initial state
 
@@ -42,15 +38,18 @@ end
 % Add resursively sub-directories in the Matlab path.
 addpath(genpath(fullfile(root_dir, "wtjacket")));
 
+% Reset warnings state.
+warning('on');
+
 %% Execute the code
 
 % 1. Modeling of the structure.
-modeling(sdiv, plt);
+modeling(sdiv, opts);
 
 % 2. Transient response.
-transient(plt);
+transient(opts);
 
 % 3. Reduction methods.
-reduction(plt);
+reduction(opts);
 
 end
