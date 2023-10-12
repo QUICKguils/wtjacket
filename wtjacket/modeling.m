@@ -1,19 +1,31 @@
-function modeling(sdiv, plt)
+function modeling(sdiv, opts)
 % MODELING  Model of the wt jacket, using 3D beam elements.
 %
 % Arguments:
-%	sdiv (int)            -- Number of subdivisions in the bare structure.
-%	plt  (char {'p', ''}) -- 'p' -> Enable plots creation.
+%	sdiv (int)      -- Number of subdivisions in the bare structure.
+%	opts (1xN char) -- Options.
+%	  ''  -> No options.
+%	  'p' -> Enable plots creation.
+%	  'w' -> Enable warnings.
 
-prepare_fem_simulation(plt);
-run_fem_simulation(sdiv, plt);
+% % Disable warnings, if desired.
+% if ~contains(opts, 'w')
+% 	warning('off', 'wtjacket:ShouldBeSymmetric');
+% 	warning('off', 'wtjacket:WrongRbmMass');
+% 	warning('off', 'wtjacket:WrongRbmForces');
+% end
+
+prepare_fem_simulation(opts);
+run_fem_simulation(sdiv, opts);
 end
 
-function prepare_fem_simulation(plt)
+function prepare_fem_simulation(opts)
 % PREPARE_FEM_SIMULATION  Set the FEM simulation initial state.
 %
-%	Argument:
-%	  plt (char {'p', ''}) -- 'p' -> Enable plots creation.
+% Argument:
+%	opts (char {'p', 'w', ''}) -- Options.
+%	  'p' -> Enable plots creation.
+%	  'w' -> Enable warnings.
 
 % Reset class internal states, close previous plots.
 clear Node Elem
@@ -21,7 +33,7 @@ close all;
 
 % Initialize MAT file.
 constants();
-bare_struct(plt);
+bare_struct(opts);
 end
 
 function run_fem_simulation(sdiv, plt)
@@ -48,6 +60,7 @@ function run_fem_simulation(sdiv, plt)
 %		KM.M      (N x N)         -- Global mass     matrix, with    constraints.
 
 %TODO:
+% - Fix diameters on NX.
 % - Tidy up shared variables and argument variables.
 %   For example, why is BS shared and not SS ?
 
@@ -224,23 +237,21 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		K_free = zeros(SS.nbDOF);
 		M_free = zeros(SS.nbDOF);
 
+		% Add the beams.
 		for elem = SS.listElem
 			locel = [elem{:}.n1.dof, elem{:}.n2.dof];
 			K_free(locel, locel) = K_free(locel, locel) + elem{:}.K_es;
 			M_free(locel, locel) = M_free(locel, locel) + elem{:}.M_es;
 		end
 
-		% Add the nacelle inertia.
-		% TODO: not super robust to hardcode the nacelle index.
-		tr_dofs  = BS.listNode{end}.dof(1:3);
-		rot_dofs = BS.listNode{end}.dof(4:6);
-		tr_idx  = sub2ind(size(M_free), tr_dofs, tr_dofs);
-		rot_idx = sub2ind(size(M_free), rot_dofs, rot_dofs);
-		M_free(tr_idx)  = M_free(tr_idx) + C.nacelle_mass;
-		M_free(rot_idx) = M_free(rot_idx) + C.nacelle_inertia;
+		% Add the concentrated masses.
+		for cm = BS.listCM
+			ind  = sub2ind(size(M_free), cm{:}.node.dof, cm{:}.node.dof);
+			M_free(ind)  = M_free(ind) + [repmat(cm{:}.mass, 1, 3), cm{:}.Jx, cm{:}.Iyy, cm{:}.Izz];
+		end
 
-		check_sym(K_free);
-		check_sym(M_free);
+		allclose(K_free, K_free');
+		allclose(M_free, M_free');
 	end
 
 	function maskCstr = create_cstr_mask(SS)
@@ -271,19 +282,19 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		%	K (nbDOF x nbDOF double) -- Global stiffness matrix.
 		%	M (nbDOF x nbDOF double) -- Global mass matrix.
 
-		% Supress rows and columns corresponding to clamped node DOFs.
-		K_free(:, maskCstr) = [];
-		M_free(:, maskCstr) = [];
-		K_free(maskCstr, :) = [];
-		M_free(maskCstr, :) = [];
-
 		K = K_free;
 		M = M_free;
+
+		% Supress rows and columns corresponding to clamped node DOFs.
+		K(:, maskCstr) = [];
+		M(:, maskCstr) = [];
+		K(maskCstr, :) = [];
+		M(maskCstr, :) = [];
 	end
 
 %% 3. Solve the eigenvalue problem
 
-	function SOL = get_solution(K, M, SS, maskCstr, nbMode)
+	function SOL = get_solution(K, M, SS, maskCstr, nbMode, solver)
 		% GET_SOLUTION  Get the natural frequencies and corresponding modes.
 		%
 		% Arguments:
@@ -292,27 +303,61 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		%	SS       (struct)               -- Subdivised structure.
 		%	maskCstr (1 x nbDOF bool)       -- Index on constrained DOFs.
 		%	nbMode   (int, default: 8)      -- Number of first modes desired.
+		%	solver   (char, default: 's')   -- Type of solver.
+		%	  'f'  -> Use the eig  solver (better for small full matrices).
+		%	  's' -> Use the eigs solver (better for large sparse matrices).
 		% Returns:
 		%	SOL (struct) -- Solution of the vibration problem, with fields:
 		%	  modes  (nbDOF x nbMode double) -- Modal displacement vectors.
 		%	  freqs  (1 x nbMode)            -- Natural frequencies, in Hertz.
 		%	  nbMode (int)                   -- Number of computed modes.
 
-		% By default, the eight first modes are desired.
-		if nargin == 4
+		if nargin < 5
 			nbMode = 8;
+			solver = 's';
 		end
 
-		% Find the first eigvecs and eigvals.
-		sigma = 0.4; % 'smallestabs';  % Could be advised to use a scalar value.
-		[eigvecs, eigvals] = eigs(K, M, nbMode, sigma);
+		switch solver
+			case 's'
+				[freqs, modes] = solve_eigs();
+			case 'f'
+				[freqs, modes] = solve_eig();
+			otherwise
+				error("Unable to determine which solver to use. Specify either 'f' or 's'.");
+		end
 
-		% Extract the natural frequencies.
-		freqs = sqrt(diag(eigvals)) / (2*pi);
 
-		% Build modal displacements: add clamped nodes.
-		modes = zeros(SS.nbDOF, nbMode);
-		modes(~maskCstr, :) = eigvecs;
+		function [freqs, modes] = solve_eigs()
+			% Solve the eigenvalue problem.
+			sigma = 'smallestabs';  % Could be advised to use a scalar value.
+			% TODO: try to make the 'isSymmetricDefinite' option working.
+			[eigvecs, eigvals] = eigs(K, M, nbMode, sigma);
+
+			% Extract the natural frequencies.
+			freqs = sqrt(diag(eigvals)) / (2*pi);
+
+			% Build modal displacements: add clamped nodes.
+			modes = zeros(SS.nbDOF, nbMode);
+			modes(~maskCstr, :) = eigvecs;
+		end
+
+		function [freqs, modes] = solve_eig()
+			% Solve the eigenvalue problem.
+			[eigvecs, eigvals] = eig(K, M);
+
+			% Sort in ascending order.
+			[eigvals, ind] = sort(diag(eigvals));
+			eigvecs = eigvecs(:, ind);
+			% Extract the first natural frequencies.
+			freqs = sqrt(eigvals) / (2*pi);
+			freqs = freqs(1:nbMode);
+			% Extract corresponding eigvecs.
+			eigvecs = eigvecs(:, 1:nbMode);
+
+			% Build modal displacements: add clamped nodes.
+			modes = zeros(SS.nbDOF, nbMode);
+			modes(~maskCstr, :) = eigvecs;
+		end
 
 		SOL.freqs  = freqs;
 		SOL.modes  = modes;
@@ -367,7 +412,7 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 
 %% 5. Total mass and sanity checks
 
-	function varargout = rbm_checks(M_free, K_free, nbNode)
+	function varargout = rbm_checks(K_free, M_free, nbNode)
 		% RBM_CHECKS  Perform sanity checks based on rbm movement.
 		%
 		% This function uses a translation along the X-axis as a rigid
@@ -394,15 +439,8 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		g_rbm = K_free * u_rbm;
 
 		% Sanity checks.
-		if abs((mass_rbm-BS.mass)/BS.mass) > 1e-2
-			warning('wtjacket:WrongRbmMass', ...
-				"RBM in translation yields to a wrong total mass calculation.");
-		end
-		if ~all(g_rbm < 1e-2)
-			warning('wtjacket:WrongRbmForces', ...
-				"Generalized forces required to translate along a RBM should be null.");
-		end
-		disp(mass_rbm);
+		allclose(BS.mass, mass_rbm);
+		% TODO: implement a proper check for g_rbm
 
 		% Return mass_rbm, if wanted.
 		varargout = cell(nargout, 1);
