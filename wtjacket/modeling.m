@@ -429,9 +429,11 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		% Return:
 		%	mass_rbm (double, optional) -- Mass calculated from RBM [kg].
 
-		% Translation of 1m along the X-axis.
-		u_rbm = repmat([1, 0, 0, 0, 0, 0]', nbNode, 1);
-
+		% Rigid translation of 1m in amplitude.
+		rbtranslation = cat(1, rand(3, 1), zeros(3, 1));
+		u_rbm = repmat(rbtranslation, nbNode, 1);
+		u_rbm = u_rbm./norm(u_rbm);
+		
 		% Mass calculated from this translation.
 		% FIX: this is wrong: generalized masses are defined to a constant.
 		mass_rbm = u_rbm' * M_free * u_rbm;

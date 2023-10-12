@@ -1,5 +1,5 @@
 function fem_convergence
-% CONVERGENCE  Analyze the convergence of the FEM simulation.
+    % CONVERGENCE  Analyze the convergence of the FEM simulation.
 
 % TODO:
 % - make an opts to write in MAT file ?
@@ -7,14 +7,17 @@ function fem_convergence
 % - implement other ways to analyze the convergence, e.g. MAC w.r.t. the
 %   NX modes ?
 
-MLSol = gen_matlab_sol(1:5);
+MLSol = gen_matlab_sol();
 NXSol = load_nx_sol();
 
 plot_freq_convergence(MLSol);
 plot_freq_convergence(NXSol);
 
-plot_mode_convergence(MLSol);
-plot_mode_convergence(NXSol);
+%plot_mass_convergence(MLSol);
+%plot_mass_convergence(NXSol);
+
+% plot_mode_convergence(MLSol);
+% plot_mode_convergence(NXSol);
 end
 
 function MLSol = gen_matlab_sol(sdiv_set)
@@ -33,28 +36,43 @@ if ~isfile(fullfile(res_file, "modeling_sol.mat"))
 	modeling(1, '');
 end
 SOL = load(fullfile(res_file, "modeling_sol.mat"));
+BS = load(fullfile(res_file, "bare_struct.mat"));
 
 % Desired sdiv sequence.
 if nargin == 0
 	sdiv_set = 1:8;
 end
 
-% Gather the frequencies for the desired subdivisions.
+% Gather the frequencies, modes, masses for the desired subdivisions.
 freq_set = zeros(numel(sdiv_set), SOL.nbMode);
+modes_set = zeros(numel(sdiv_set), BS.nbDOF, SOL.nbMode);    
+masses_set = zeros(numel(sdiv_set), 2);
+
 for i = 1:numel(sdiv_set)
-	modeling(sdiv_set(i), 'w');
+	modeling(sdiv_set(i), '');
 	SOL = load("res\modeling_sol.mat");
+	BS = load(fullfile(res_file, "bare_struct.mat"));
+
 	freq_set(i, :) = SOL.freqs;
+
+	for d = 1:BS.nbDOF
+		modes_set(i, d, :) = SOL.modes(d,:);
+	end
+
+	masses_set(i, 1) = SOL.mass_rbm;
+	masses_set(i, 2) = SOL.mass_rbm/BS.mass;
 end
 
 % Build return data structure.
-MLSol.sdiv_set = sdiv_set;
-MLSol.freq_set = freq_set;
-MLSol.name     = 'Matlab';
+MLSol.sdiv_set   = sdiv_set;
+MLSol.freq_set   = freq_set;
+MLSol.modes_set  = modes_set;
+MLSol.masses_set = masses_set;
+MLSol.name = 'Matlab';
 end
 
 function NXSol = load_nx_sol
-% LOAD_NX_SOL  Load the solution found via the NX simulations.
+    % LOAD_NX_SOL  Load the solution found via the NX simulations.
 
 % Sequence of number of subdivisions.
 NXSol.sdiv_set = 1:8;
@@ -69,47 +87,132 @@ NXSol.freq_set = [ ...
 	4.42402521E-01, 4.49817148E-01, 9.60603515E-01, 6.86826852E+00, 7.30024217E+00, 1.63411049E+01, 1.96566395E+01, 2.13371681E+01; ...
 	4.42402521E-01, 4.49817148E-01, 9.60603513E-01, 6.86823904E+00, 7.30020852E+00, 1.63410622E+01, 1.96557576E+01, 2.13360949E+01];
 
-NXSol.name = 'NX';
+    NXSol.name = 'NX';
 end
 
 function plot_freq_convergence(SolSet)
-% PLOT_FREQ_CONVERGENCE  Generate convergence graphs for the frequencies.
-%
-% Arguments:
-%	SolSet (struct) -- Set of solution, with fields:
-%	  sdiv_set (1xN int)    -- Set of number of subdivisions.
-%	  freq_set (1xN double) -- Set of associated frequencies.
-%	  name     (char)       -- Name of the solution.
+    % PLOT_FREQ_CONVERGENCE  Generate convergence graphs for the frequencies.
+    %
+    % Arguments:
+    %	SolSet (struct) -- Set of solution, with fields:
+    %	  sdiv_set (1xN int)    -- Set of number of subdivisions.
+    %	  freq_set (1xN double) -- Set of associated frequencies.
+    %	  name     (char)       -- Name of the solution.
 
-% Build the solution name.
-if SolSet.name ~= ""
-	SolSet.name = " (" + SolSet.name + ")";
+    % Build the solution name.
+    if SolSet.name ~= ""
+        SolSet.name = " (" + SolSet.name + ")";
+    end
+
+    % Instantiate a figure object.
+    figure("WindowStyle", "docked");
+
+    % Plot the frequencies.
+    subplot(1, 2, 1);
+    plot(SolSet.sdiv_set, SolSet.freq_set);
+    title("Frequencies convergence" + SolSet.name);
+    xlabel("Number of sub-elements");
+    ylabel("Natural frequency (Hz)");
+    grid;
+
+    % Plot the residuals.
+    subplot(1, 2, 2);
+    % NOTE:
+    % this way of defining residuals is taken from the fluid mechanics
+    % course, section 3.3.
+    residuals = abs(diff(SolSet.freq_set)) ./ abs(SolSet.freq_set(2, :) - SolSet.freq_set(1, :));
+    semilogy(SolSet.sdiv_set(1:end-1), residuals);
+    title("Residuals convergence" + SolSet.name);
+    xlabel("Number of sub-elements");
+    ylabel("Residual");
+    grid;
 end
 
-% Instantiate a figure object.
-figure("WindowStyle", "docked");
+function plot_mass_convergence(SolSet)
+    % TODO mass convergence analysis
 
-% Plot the frequencies.
-subplot(1, 2, 1);
-plot(SolSet.sdiv_set, SolSet.freq_set);
-title("Frequencies convergence" + SolSet.name);
-xlabel("Number of sub-elements");
-ylabel("Natural frequency (Hz)");
-grid;
+    % Mass convergence
+    figure("WindowStyle", "docked");
+    subplot(1,2,1);
+    plot(sdiv_serie, SolSet.masses_set(:, 1));
+    title("RBM Total Mass convergence");
+    xlabel("Number of sub-elements");
+    ylabel("Total mass from RBM (kg)");
+    grid;
 
-% Plot the residuals.
-subplot(1, 2, 2);
-% NOTE:
-% this way of defining residuals is taken from the fluid mechanics
-% course, section 3.3.
-residuals = abs(diff(SolSet.freq_set)) ./ abs(SolSet.freq_set(2, :) - SolSet.freq_set(1, :));
-semilogy(SolSet.sdiv_set(1:end-1), residuals);
-title("Residuals convergence" + SolSet.name);
-xlabel("Number of sub-elements");
-ylabel("Residual");
-grid;
+    subplot(1,2,2);
+    plot(sdiv_serie, SolSet.masses_set(:, 2));
+    title("RBM Total Mass - Theoretical Mass Ratio convergence"); % TODO better title ?
+    xlabel("Number of sub-elements");
+    ylabel("Mass ratio [-]");
+    grid;
+
 end
 
 function plot_mode_convergence(SolSet)
-% TODO: implement this badboy
+    % TODO: implement this badboy
+        
+    % Compute the relative differences between modes amplitudes
+    mode_diff = zeros(numel(sdiv_serie)-1, BS.nbDOF, SOL.nbMode);
+    norm_mode_diff = zeros(numel(sdiv_serie)-1, SOL.nbMode);
+
+    for i = 1:numel(sdiv_serie)-1
+        mode_diff(i, :, :) = abs(modes_serie(i+1, :, :) -  modes_serie(i, :, :));
+
+        for m = 1:SOL.nbMode
+            norm_mode_diff(i,m) = norm(mode_diff(i, :, m));
+        end
+    end
+
+    % MAC
+    % this section computes the MAC for each successive mode
+    MAC_arr = zeros(numel(sdiv_serie)-1, SOL.nbMode, SOL.nbMode);
+
+    for i = 1:numel(sdiv_serie)-1
+        MAC_arr(i, :, :) = MAC(modes_serie(i, :, :), modes_serie(i+1, :, :), SOL);
+    end
+
+    % NOTE pretty certain MAC(mi, mi+1) should converge to eye(nbMode)
+    % if modes do converge ?
+
+    % Instantiate a figure object.
+    figure("WindowStyle", "docked");
+
+    % Plot of MAC convergence
+    for i = 1:numel(sdiv_serie)-1
+        subplot(1, numel(sdiv_serie), i);
+        image(reshape(MAC_arr(i,:,:), SOL.nbMode, SOL.nbMode) ,'CDataMapping','scaled')
+        colorbar
+    end
+
+    % Mode convergence
+    subplot(1, 3, 3);
+    plot(sdiv_serie(2:end), norm_mode_diff);
+    title("Mode L2 norm convergence");
+    xlabel("Number of sub-elements");
+    ylabel("Relative difference mode norm");
+    grid;
+end
+
+function mac = MAC(m1, m2, SOL)
+    % MAC Compute Modal Assurance Criterion
+    %
+    % Arguments
+    %   m1   1 x nbMode x nbDOF
+    %   m2   1 x nbMode x nbDOF
+    %
+    % Returns
+    %   mac  nbMode x nbMode
+
+    % mac(m1, m2)[i][j] = ( (m1[i]' * m2[j]) / (|m1| * |m2|) )^2
+    mac = zeros(SOL.nbMode, SOL.nbMode);
+    for i = 1:SOL.nbMode
+        for j = 1:SOL.nbMode
+
+            norm_m1 = norm(m1(1, :, i));
+            norm_m2 = norm(m2(1, :, j));
+
+            mac(i,j) = (1 / (norm_m1 * norm_m2) * m1(1, :, i) * m2(1, :, j)').^2;
+        end
+    end
 end
