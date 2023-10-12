@@ -60,7 +60,6 @@ function run_fem_simulation(sdiv, plt)
 %		KM.M      (N x N)         -- Global mass     matrix, with    constraints.
 
 %TODO:
-% - Fix diameters on NX.
 % - Tidy up shared variables and argument variables.
 %   For example, why is BS shared and not SS ?
 
@@ -429,10 +428,8 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		% Return:
 		%	mass_rbm (double, optional) -- Mass calculated from RBM [kg].
 
-		% Rigid translation of 1m in amplitude.
-		rbtranslation = cat(1, rand(3, 1), zeros(3, 1));
-		u_rbm = repmat(rbtranslation, nbNode, 1);
-		u_rbm = u_rbm./norm(u_rbm);
+		% Rigid translation of 1m along the X-axis.
+		u_rbm = repmat([1, 0, 0, 0, 0, 0]', nbNode, 1);
 		
 		% Mass calculated from this translation.
 		% FIX: this is wrong: generalized masses are defined to a constant.
