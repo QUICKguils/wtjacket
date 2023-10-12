@@ -125,6 +125,10 @@ listElem = {
 	RigidLink(listNode{21}, listNode{22});
 	}';
 
+%% Concentrated masses
+
+listCM = {ConcentratedMass(listNode{22})};
+
 %% Total mass
 
 % Initialise the total mass of the bare structure [kg].
@@ -133,8 +137,10 @@ mass = 0;
 for elem = listElem
 	mass = mass + elem{:}.mass;
 end
-% Account for the nacelle.
-mass = mass + C.nacelle_mass;
+% Account for the concentrated masses.
+for cm = listCM
+	mass = mass + cm{:}.mass;
+end
 
 %% Bare structure plot
 
@@ -147,6 +153,7 @@ end
 % Gather relevant data to save.
 BS.listNode = listNode;
 BS.listElem = listElem;
+BS.listCM   = listCM;
 BS.nbNode   = numel(listNode);
 BS.nbElem   = numel(listElem);
 BS.nbDOF    = BS.nbNode * Node.nbDOF;

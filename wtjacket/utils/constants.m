@@ -9,9 +9,7 @@ function constants
 C.leg_angle       = 3;                  % Angle of the main legs w.r.t. the Z-axis [°].
 C.base_width      = 5;                  % Width at the base of the structure [m].
 C.frame_height    = [0, 1, 9, 17, 25];  % Heights of the horizontal frames [m].
-C.nacelle_height  = 80;                 % Height   of the nacelle [m].
-C.nacelle_mass    = 200e3;              % Mass     of the nacelle [kg].
-C.nacelle_inertia = 24e6;               % Inertias of the nacelle [kg*m²].
+C.nacelle_height  = 80;                 % Height of the nacelle [m].
 
 %% Transient response
 
