@@ -13,7 +13,7 @@ NXSol = load_nx_sol();
 plot_freq_convergence(MLSol);
 plot_freq_convergence(NXSol);
 
-%plot_mass_convergence(MLSol);
+plot_mass_convergence(MLSol);
 %plot_mass_convergence(NXSol);
 
 % plot_mode_convergence(MLSol);
@@ -134,14 +134,14 @@ function plot_mass_convergence(SolSet)
     % Mass convergence
     figure("WindowStyle", "docked");
     subplot(1,2,1);
-    plot(sdiv_serie, SolSet.masses_set(:, 1));
+    plot(SolSet.sdiv_set, SolSet.masses_set(:, 1));
     title("RBM Total Mass convergence");
     xlabel("Number of sub-elements");
     ylabel("Total mass from RBM (kg)");
     grid;
 
     subplot(1,2,2);
-    plot(sdiv_serie, SolSet.masses_set(:, 2));
+    plot(SolSet.sdiv_set, SolSet.masses_set(:, 2));
     title("RBM Total Mass - Theoretical Mass Ratio convergence"); % TODO better title ?
     xlabel("Number of sub-elements");
     ylabel("Mass ratio [-]");
