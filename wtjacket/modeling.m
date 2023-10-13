@@ -6,14 +6,6 @@ function modeling(sdiv, opts)
 %	opts (1xN char) -- Options.
 %	  ''  -> No options.
 %	  'p' -> Enable plots creation.
-%	  'w' -> Enable warnings.
-
-% % Disable warnings, if desired.
-% if ~contains(opts, 'w')
-% 	warning('off', 'wtjacket:ShouldBeSymmetric');
-% 	warning('off', 'wtjacket:WrongRbmMass');
-% 	warning('off', 'wtjacket:WrongRbmForces');
-% end
 
 prepare_fem_simulation(opts);
 run_fem_simulation(sdiv, opts);
@@ -44,20 +36,20 @@ function run_fem_simulation(sdiv, plt)
 %	plt  (char {'p', ''}) -- 'p' -> Enable plots creation.
 % Save:
 %	SS (struct) -- Subdivised structure, with fields:
-%		listNode {1xN Node} -- Cell list of nodes.
-%		listElem {1xN Elem} -- Cell list of elements.
-%		nbNode   (int)      -- Number    of nodes.
-%		nbElem   (int)      -- Number    of elements.
-%		nbDOF    (int)      -- Number    of DOFs.
+%	  listNode {1xN Node} -- Cell list of nodes.
+%	  listElem {1xN Elem} -- Cell list of elements.
+%	  nbNode   (int)      -- Number    of nodes.
+%	  nbElem   (int)      -- Number    of elements.
+%	  nbDOF    (int)      -- Number    of DOFs.
 %	SOL (struct) -- Solution of the vibration problem, with fields:
-%		modes  (nbDOF x nbMode double) -- Modal displacement vectors.
-%		freqs  (1 x nbMode)            -- Natural frequencies, in Hertz.
-%		nbMode (int)                   -- Number of computed modes.
+%	  modes  (nbDOF x nbMode double) -- Modal displacement vectors.
+%	  freqs  (1 x nbMode)            -- Natural frequencies, in Hertz.
+%	  nbMode (int)                   -- Number of computed modes.
 %	KM (struct) -- Global structural matrices, with fields:
-%		KM.K_free (nbDOF x nbDOF) -- Global siffness matrix, without constraints.
-%		KM.M_free (nbDOF x nbDOF) -- Global mass     matrix, without constraints.
-%		KM.K      (N x N)         -- Global siffness matrix, with    constraints.
-%		KM.M      (N x N)         -- Global mass     matrix, with    constraints.
+%	  KM.K_free (nbDOF x nbDOF) -- Global siffness matrix, without constraints.
+%	  KM.M_free (nbDOF x nbDOF) -- Global mass     matrix, without constraints.
+%	  KM.K      (N x N)         -- Global siffness matrix, with    constraints.
+%	  KM.M      (N x N)         -- Global mass     matrix, with    constraints.
 
 %TODO:
 % - Tidy up shared variables and argument variables.
@@ -128,11 +120,11 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		%	sdiv (int) -- Number of subsivisions desired.
 		% Return:
 		%	SS (struct) with fields:
-		%		listNode {1xN Node} -- Cell list of nodes.
-		%		listElem {1xN Elem} -- Cell list of elements.
-		%		nbNode   (int)      -- Number of nodes.
-		%		nbElem   (int)      -- Number of elements.
-		%		nbDOF    (int)      -- Number of DOFs.
+		%	  listNode {1xN Node} -- Cell list of nodes.
+		%	  listElem {1xN Elem} -- Cell list of elements.
+		%	  nbNode   (int)      -- Number of nodes.
+		%	  nbElem   (int)      -- Number of elements.
+		%	  nbDOF    (int)      -- Number of DOFs.
 
 		% Preallocate the node and element lists of the subdivised structure.
 		nbNode   = BS.nbNode + (sdiv-1)*BS.nbElem;
@@ -325,7 +317,6 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 				error("Unable to determine which solver to use. Specify either 'f' or 's'.");
 		end
 
-
 		function [freqs, modes] = solve_eigs()
 			% Solve the eigenvalue problem.
 			sigma = 'smallestabs';  % Could be advised to use a scalar value.
@@ -432,7 +423,6 @@ save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
 		u_rbm = repmat([1, 0, 0, 0, 0, 0]', nbNode, 1);
 		
 		% Mass calculated from this translation.
-		% FIX: this is wrong: generalized masses are defined to a constant.
 		mass_rbm = u_rbm' * M_free * u_rbm;
 		% Forces calculated from this translation.
 		g_rbm = K_free * u_rbm;

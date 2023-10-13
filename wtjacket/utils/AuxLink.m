@@ -7,7 +7,7 @@ classdef AuxLink < Elem
 
 			% Assigned diameter [m] (see project statement).
 			d = 0.6;
-			
+
 			al = al@Elem(d, n1, n2);
 		end
 

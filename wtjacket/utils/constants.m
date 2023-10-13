@@ -18,7 +18,7 @@ C.tail_weight       = 1e3;       % Weight of one whale tail [kg].
 C.impact_speed      = 25 / 3.6;  % Velocity of the tail during the impact [m/s].
 C.impact_duration   = 0.05;      % Duration of the impact [s].
 C.momentum_transfer = 0.85;      % Proportion of the momentum transferred to the jacket [-].
-C.force_direction   = 45;        % Direction of the impact force, w.r.t. the X-axis.
+C.force_direction   = 45;        % Direction of the impact force, w.r.t. the X-axis [°].
 C.damping_ratio     = 5e-3;      % Damping ratio of the first two modes [-].
 
 %% Save data into constants.mat

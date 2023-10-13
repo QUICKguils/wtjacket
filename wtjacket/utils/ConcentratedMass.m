@@ -5,10 +5,10 @@ classdef ConcentratedMass
 		% Node location of the concentrated mass.
 		node Node
 		% Pyhsical parameters.
-		mass (1, 1) double {mustBeReal} = 200e3; % Mass [kg].
-		Jx   (1, 1) double {mustBeReal} = 24e6;  % Area moment along the X-axis [m^4].
-		Iyy  (1, 1) double {mustBeReal} = 24e6;  % Area moment along the Y-axis [m^4].
-		Izz  (1, 1) double {mustBeReal} = 24e6;  % Area moment along the Z-axis [m^4].
+		mass (1, 1) double {mustBeReal} = 200e3;  % Mass [kg].
+		Jx   (1, 1) double {mustBeReal} = 24e6;   % Area moment along the X-axis [m^4].
+		Iyy  (1, 1) double {mustBeReal} = 24e6;   % Area moment along the Y-axis [m^4].
+		Izz  (1, 1) double {mustBeReal} = 24e6;   % Area moment along the Z-axis [m^4].
 	end
 
 	methods

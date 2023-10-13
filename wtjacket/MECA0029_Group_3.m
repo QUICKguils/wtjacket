@@ -2,11 +2,10 @@ function MECA0029_Group_3(varargin)
 % MECA0029_Group_3  triggers all the code of the project.
 %
 % Arguments:
-%	sdiv (int, default: 3)        -- Number of subsivisions in the bare structure.
-%	opts (1xN char, default: 'p') -- Options.
+%	sdiv (int)      -- Number of subsivisions in the bare structure (default: 3).
+%	opts (1xN char) -- Options (default: 'p').
 %	  ''  -> No options.
 %	  'p' -> Enable plots creation.
-%	  'w' -> Enable warnings.
 
 %% Options setting
 
@@ -37,9 +36,6 @@ end
 
 % Add resursively sub-directories in the Matlab path.
 addpath(genpath(fullfile(root_dir, "wtjacket")));
-
-% Reset warnings state.
-warning('on');
 
 %% Execute the code
 

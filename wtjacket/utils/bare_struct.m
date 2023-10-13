@@ -6,11 +6,13 @@ function bare_struct(opts)
 %	  'p' -> Enable plots creation.
 % Save:
 %	BS (struct) with fields:
-%		listNode {1xN Node} -- Cell list of bare structure nodes.
-%		listElem {1xN Elem} -- Cell list of bare structure elements.
-%		nbNode   (int)      -- Number    of bare structure nodes.
-%		nbElem   (int)      -- Number    of bare structure elements.
-%		nbDOF    (int)      -- Number    of bare structure DOFs.
+%		listNode {1xN Node}             -- Cell list of bare structure nodes.
+%		listElem {1xN Elem}             -- Cell list of bare structure elements.
+%		listCM   {1xN ConcentratedMass} -- Cell list of concentrated masses.
+%		nbNode   (int)                  -- Number of bare structure nodes.
+%		nbElem   (int)                  -- Number of bare structure elements.
+%		nbDOF    (int)                  -- Number of bare structure DOFs.
+%		mass     (int)                  -- Total mass of the structure [kg].
 
 %% Imports
 
@@ -23,28 +25,25 @@ C = load(fullfile(file_dir, "../../res/constants.mat"));
 %% Nodes
 
 % TODO: find a more robust way to propagate default argument 'free'.
-	function frame = elevate(h, cstrList)
+	function frame = elevate(h, listCstr)
 		% ELEVATE  Create a frame of nodes, for the desired altitude.
 		%
 		% Arguments:
-		%	h (double)
-		%		Altitude [m].
-		%	cstrList (1x4 Node.cstr) -- Optional, default is (1x4 "free").
-		%		Array of nodes constraint type.
+		%	h        (double)        -- Altitude [m].
+		%	listCstr (1x4 Node.cstr) -- Array of nodes constraint type (default: 1x4 "free").
 		% Return:
-		%	frame {1x4 Node}
-		%		Frame of nodes.
+		%	frame {1x4 Node} -- Frame of nodes.
 
 		if nargin == 1
-			cstrList = repmat("free", 1, 4);
+			listCstr = repmat("free", 1, 4);
 		end
 
 		shift = tand(C.leg_angle) * h;
 		frame = {
-			Node([             shift,              shift,  h], cstrList(1));
-			Node([C.base_width-shift,              shift,  h], cstrList(2));
-			Node([C.base_width-shift, C.base_width-shift,  h], cstrList(3));
-			Node([             shift, C.base_width-shift,  h], cstrList(4))};
+			Node([             shift,              shift,  h], listCstr(1));
+			Node([C.base_width-shift,              shift,  h], listCstr(2));
+			Node([C.base_width-shift, C.base_width-shift,  h], listCstr(3));
+			Node([             shift, C.base_width-shift,  h], listCstr(4))};
 	end
 
 % Cell containing the 22 nodes of the bare structure.
