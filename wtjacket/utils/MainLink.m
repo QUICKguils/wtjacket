@@ -6,9 +6,9 @@ classdef MainLink < Elem
 			% MAINLINK  Construct an instance of MainLink.
 
 			% Assigned diameter [m] (see project statement).
-			d = 1;
+			diameter = 1;
 
-			ml = ml@Elem(d, n1, n2);
+			ml = ml@Elem(diameter, n1, n2);
 		end
 
 		function plotElem(ml, varargin)

@@ -2,7 +2,7 @@ classdef Node
 	% NODE  Represent a 3D structural node.
 
 	properties (Constant, Hidden)
-		nbDOF    = 6;                                 % Number of DOFs of a node.
+		nDof     = 6;                                 % Number of DOFs of a node.
 		cstrType = categorical(["free", "clamped"]);  % Possible constraints types.
 	end
 
@@ -18,24 +18,24 @@ classdef Node
 			% SETLABEL  Set the label of the Node instance.
 			%	This method keeps track of the label number assignment
 			%	through a persistent variable.
-			persistent label_cnt;
-			if isempty(label_cnt)
-				label_cnt = 0;
+			persistent labelCounter;
+			if isempty(labelCounter)
+				labelCounter = 0;
 			end
-			label_cnt = label_cnt + 1;
-			label = label_cnt;
+			labelCounter = labelCounter + 1;
+			label = labelCounter;
 		end
 
 		function dof = setDof()
 			% SETDOF  Set the DOFs of the Node instance.
 			%	This method keeps track of the DOFs number assigment
 			%	though a persistent variable.
-			persistent dof_cnt;
-			if isempty(dof_cnt)
-				dof_cnt = 0;
+			persistent dofCounter;
+			if isempty(dofCounter)
+				dofCounter = 0;
 			end
-			dof = dof_cnt + (1:Node.nbDOF);
-			dof_cnt = dof_cnt + Node.nbDOF;
+			dof = dofCounter + (1:Node.nDof);
+			dofCounter = dofCounter + Node.nDof;
 		end
 	end
 

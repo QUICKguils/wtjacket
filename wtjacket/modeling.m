@@ -1,440 +1,396 @@
-function modeling(sdiv, opts)
+function [BS, SS, KM, SOL] = modeling(C, sdiv, nMode, opts)
 % MODELING  Model of the wt jacket, using 3D beam elements.
 %
 % Arguments:
-%	sdiv (int)      -- Number of subdivisions in the bare structure.
-%	opts (1xN char) -- Options.
+%	C     (struct)   -- Constant project quantities.
+%	sdiv  (int)      -- Number of subdivisions in the bare structure.
+%	nMode (int)      -- Number of first mode computed.
+%	opts  (1xN char) -- Options.
 %	  ''  -> No options.
 %	  'p' -> Enable plots creation.
-
-prepare_fem_simulation(opts);
-run_fem_simulation(sdiv, opts);
-end
-
-function prepare_fem_simulation(opts)
-% PREPARE_FEM_SIMULATION  Set the FEM simulation initial state.
-%
-% Argument:
-%	opts (char {'p', 'w', ''}) -- Options.
-%	  'p' -> Enable plots creation.
-%	  'w' -> Enable warnings.
+% Return:
+%	BS (struct) -- Bare structure, with fields:
+%		nodeList {1xN Node}             -- Cell list of nodes.
+%		elemList {1xN Elem}             -- Cell list of elements.
+%		cmList   {1xN ConcentratedMass} -- Cell list of concentrated masses.
+%		nNode    (int)                  -- Number of nodes.
+%		nElem    (int)                  -- Number of elements.
+%		nDof     (int)                  -- Number of DOFs.
+%		mass     (int)                  -- Total mass of the structure [kg].
+%	SS (struct) -- Subdivised structure, with fields:
+%	  nodeList {1xN Node} -- Cell list of nodes.
+%	  elemList {1xN Elem} -- Cell list of elements.
+%	  nNode   (int)       -- Number of nodes.
+%	  nElem   (int)       -- Number of elements.
+%	  nDof    (int)       -- Number of DOFs.
+%	KM (struct) -- Global structural matrices, with fields:
+%	  KM.K_free (nDof x nDof) -- Global siffness matrix, without constraints.
+%	  KM.M_free (nDof x nDof) -- Global mass     matrix, without constraints.
+%	  KM.K      (N x N)       -- Global siffness matrix, with    constraints.
+%	  KM.M      (N x N)       -- Global mass     matrix, with    constraints.
+%	SOL (struct) -- Solution of the vibration problem, with fields:
+%	  modes       (nDof x nbMode double) -- Modal displacement vectors.
+%	  freqs       (1 x nbMode)           -- Natural frequencies, in Hertz.
+%	  nMode       (int)                  -- Number of computed modes.
+%	  massFromRbm (double)               -- Mass calculated from RBM [kg].
 
 % Reset class internal states, close previous plots.
-clear Node Elem
+clear Node Elem;
 close all;
-
-% Initialize MAT file.
-constants();
-bare_struct(opts);
-end
-
-function run_fem_simulation(sdiv, plt)
-% RUN_FEM_SIMULATION  Run a finite element method simulation.
-%
-% Arguments:
-%	sdiv (int)            -- Number of subdivisions in the bare structure.
-%	plt  (char {'p', ''}) -- 'p' -> Enable plots creation.
-% Save:
-%	SS (struct) -- Subdivised structure, with fields:
-%	  listNode {1xN Node} -- Cell list of nodes.
-%	  listElem {1xN Elem} -- Cell list of elements.
-%	  nbNode   (int)      -- Number    of nodes.
-%	  nbElem   (int)      -- Number    of elements.
-%	  nbDOF    (int)      -- Number    of DOFs.
-%	SOL (struct) -- Solution of the vibration problem, with fields:
-%	  modes  (nbDOF x nbMode double) -- Modal displacement vectors.
-%	  freqs  (1 x nbMode)            -- Natural frequencies, in Hertz.
-%	  nbMode (int)                   -- Number of computed modes.
-%	KM (struct) -- Global structural matrices, with fields:
-%	  KM.K_free (nbDOF x nbDOF) -- Global siffness matrix, without constraints.
-%	  KM.M_free (nbDOF x nbDOF) -- Global mass     matrix, without constraints.
-%	  KM.K      (N x N)         -- Global siffness matrix, with    constraints.
-%	  KM.M      (N x N)         -- Global mass     matrix, with    constraints.
-
-%TODO:
-% - Tidy up shared variables and argument variables.
-%   For example, why is BS shared and not SS ?
-
-%% Imports
-
-% Directory where the present file lies.
-file_dir = fileparts(mfilename("fullpath"));
-
-% Constants and bare structure data.
-C  = load(fullfile(file_dir, "../res/constants.mat"));
-BS = load(fullfile(file_dir, "../res/bare_struct.mat"));
-
-%% Mains solve
 
 % 1. Subdivised structure
 
-SS = sdiv_struct(sdiv);
+BS = bareStructure(C, opts);
+SS = subdivisedStructure(BS, sdiv);
 
-% Plotting the subdivised structure, if desired.
-if contains(plt, 'p')
-	plot_sdiv_struct(SS.listNode, SS.listElem);
+if contains(opts, 'p')
+	plotSubdivisedStructure(SS.nodeList, SS.elemList, C.FRAME_HEIGHT(end));
 end
 
 % 2. K and M
 
-% K_free and M_free.
-[K_free, M_free] = set_global_matrices(SS);
+[KM.K_free, KM.M_free] = buildGlobalMatrices(SS.elemList, BS.cmList, SS.nDof);
 
-% Gather the constrained DOFs in a bool indexing array.
-maskCstr = create_cstr_mask(SS);
+cstrMask = buildCstrMask(SS.nodeList, SS.nDof);
 
-% Apply boundary conditions.
-[K, M] = apply_bc(K_free, M_free, maskCstr);
+[KM.K, KM.M] = applyBoundaryConditions(KM.K_free, KM.M_free, cstrMask);
 
 % 3. Eigenvalue problem solving
 
-SOL = get_solution(K, M, SS, maskCstr);
+[SOL.frequencies, SOL.modes] = solveEigenvalueProblem(KM.K, KM.M, SS.nDof, cstrMask, nMode, 's');
+SOL.nMode = nMode;  % Just to keep track of this user's input.
 
 % 4. Eigenmodes plot
 
-if contains(plt, 'p')
-	plot_vibration_mode(SS, SOL);
+if contains(opts, 'p')
+	plotVibrationMode(SS.elemList, SS.nNode, SOL, C.FRAME_HEIGHT(end));
 end
 
 % 5. Total mass and sanity checks
 
-SOL.mass_rbm = rbm_checks(K_free, M_free, SS.nbNode);
+SOL.massFromRbm = checkRbm(KM.K_free, KM.M_free, SS.nNode, BS.mass);
 
-% 6. Data saving
-
-KM.K_free = K_free;
-KM.M_free = M_free;
-KM.K = K;
-KM.M = M;
-
-save(fullfile(file_dir, "../res/sdiv_struct.mat"), "-struct", "SS");
-save(fullfile(file_dir, "../res/modeling_sol.mat"), "-struct", "SOL");
-save(fullfile(file_dir, "../res/modeling_mat.mat"), "-struct", "KM");
+end
 
 %% 1. Subdivised structure
 
-	function SS = sdiv_struct(sdiv)
-		% SDIV_STRUCT  Generate nodes and elements of the subdivised structure.
-		%
-		% Argument:
-		%	sdiv (int) -- Number of subsivisions desired.
-		% Return:
-		%	SS (struct) with fields:
-		%	  listNode {1xN Node} -- Cell list of nodes.
-		%	  listElem {1xN Elem} -- Cell list of elements.
-		%	  nbNode   (int)      -- Number of nodes.
-		%	  nbElem   (int)      -- Number of elements.
-		%	  nbDOF    (int)      -- Number of DOFs.
+function SS = subdivisedStructure(BS, sdiv)
+% SUBDIVISEDSTRUCTURE  Generate nodes and elements of the subdivised structure.
+%
+% Argument:
+%	sdiv (int)    -- Number of subsivisions desired.
+%	BS   (struct) -- Bare structure.
+% Return:
+%	SS (struct) -- Subdivised structure, with fields:
+%	  nodeList {1xN Node} -- Cell list of nodes.
+%	  elemList {1xN Elem} -- Cell list of elements.
+%	  nNode   (int)       -- Number of nodes.
+%	  nElem   (int)       -- Number of elements.
+%	  nDof    (int)       -- Number of DOFs.
 
-		% Preallocate the node and element lists of the subdivised structure.
-		nbNode   = BS.nbNode + (sdiv-1)*BS.nbElem;
-		nbElem   = sdiv*BS.nbElem;
-		listNode = cell(1, nbNode);
-		listElem = cell(1, nbElem);
-		% Prefill the listNode with existing bare nodes.
-		listNode(1:BS.nbNode) = BS.listNode;
+% Preallocate the node and element lists of the subdivised structure.
+nNode   = BS.nNode + (sdiv-1) * BS.nElem;
+nElem   = sdiv * BS.nElem;
+nodeList = cell(1, nNode);
+elemList = cell(1, nElem);
+% Prefill the nodeList with existing bare nodes.
+nodeList(1:BS.nNode) = BS.nodeList;
 
-		for i = 1:BS.nbElem
-			% Extract element and extremity nodes (for terseness).
-			elem = BS.listElem{i};
-			n1 = elem.n1;
-			n2 = elem.n2;
-			% Preallocate new subelements and subnodes.
-			selem = cell(1, sdiv);
-			snode = cell(1, sdiv+1);
-			% Prefill the subnodes.
-			snode([1, end]) = {n1, n2};
-			% Create subnodes.
-			for j = 2:numel(snode)-1
-				snode{j} = Node(n1.pos + (n2.pos-n1.pos)./sdiv*(j-1));
-			end
-			% Determine link type of selem.
-			switch class(elem)
-				case 'MainLink'
-					subLink = @MainLink;
-				case 'AuxLink'
-					subLink = @AuxLink;
-				case 'RigidLink'
-					subLink = @RigidLink;
-			end
-			% Create subelements.
-			for j = 1:numel(selem)
-				selem{j} = subLink(snode{j}, snode{j+1});
-			end
-			% Fill the listNode and listElem.
-			% TODO: try to find a more readable way of doing this.
-			listNode(BS.nbNode + (i-1)*(numel(snode)-2) + (1:(numel(snode)-2))) = snode(2:end-1);
-			listElem((i-1)*(numel(selem)) + (1:numel(selem))) = selem;
-
-		end
-
-		% Build return data structure.
-		SS.listNode = listNode;
-		SS.listElem = listElem;
-		SS.nbNode   = nbNode;
-		SS.nbElem   = nbElem;
-		SS.nbDOF    = nbNode * Node.nbDOF;
+for i = 1:BS.nElem
+	% Extract element and extremity nodes (for terseness).
+	elem = BS.elemList{i};
+	n1 = elem.n1;
+	n2 = elem.n2;
+	% Preallocate new subelements and subnodes.
+	selem = cell(1, sdiv);
+	snode = cell(1, sdiv+1);
+	% Prefill the subnodes.
+	snode([1, end]) = {n1, n2};
+	% Create subnodes.
+	for j = 2:numel(snode)-1
+		snode{j} = Node(n1.pos + (n2.pos-n1.pos)./sdiv*(j-1));
 	end
-
-	function plot_sdiv_struct(listNode, listElem)
-		% PLOT_SDIV_STRUCT  Get an overview of the structure.
-		%
-		% Arguments:
-		%	listNode {1xN Node} -- Cell list of nodes.
-		%	listElem {1xN Elem} -- Cell list of elements.
-
-		% Instantiate a figure object.
-		figure("WindowStyle", "docked");
-		hold on;
-		% Plot the nodes.
-		for node = listNode(1:end)
-			if node{:}.pos(3) > C.frame_height(end)  % ignone nacelle
-				continue
-			end
-			node{:}.plotNode()
-		end
-		% Plot the elements.
-		for elem = listElem(1:end)
-			if elem{:}.n1.pos(3) > C.frame_height(end) ...
-					|| elem{:}.n2.pos(3) > C.frame_height(end)  % ignore nacelle
-				continue
-			end
-			elem{:}.plotElem()
-		end
-		% Dress the plot.
-		xlabel("X/m");
-		ylabel("Y/m");
-		zlabel("Z/m");
-		title("Subdivised structure");
-		axis equal;
-		grid;
-		view(-35, 40);
-		hold off;
+	% Determine link type of selem.
+	switch class(elem)
+		case 'MainLink'
+			subLink = @MainLink;
+		case 'AuxLink'
+			subLink = @AuxLink;
+		case 'RigidLink'
+			subLink = @RigidLink;
+		otherwise
+			error("Cannot determine the element type.");
 	end
+	% Create subelements.
+	for j = 1:numel(selem)
+		selem{j} = subLink(snode{j}, snode{j+1});
+	end
+	% Fill the nodeList and elemList.
+	% TODO: try to find a more readable way of doing this.
+	nodeList(BS.nNode + (i-1)*(numel(snode)-2) + (1:(numel(snode)-2))) = snode(2:end-1);
+	elemList((i-1)*(numel(selem)) + (1:numel(selem))) = selem;
+
+end
+
+% Build return data structure.
+SS.nodeList = nodeList;
+SS.elemList = elemList;
+SS.nNode    = nNode;
+SS.nElem    = nElem;
+SS.nDof     = nNode * Node.nDof;
+end
+
+function plotSubdivisedStructure(nodeList, elemList, maxHeight)
+% PLOTSUBDIVISEDSTRUCTURE  Get an overview of the structure.
+%
+% Arguments:
+%	nodeList  {1xN Node} -- Cell list of nodes.
+%	elemList  {1xN Elem} -- Cell list of elements.
+%	maxHeight (double)   -- Maximum plotting height [m].
+
+% Instantiate a figure object.
+figure("WindowStyle", "docked");
+hold on;
+% Plot the nodes.
+for node = nodeList(1:end)
+	if node{:}.pos(3) > maxHeight  % ignore mast and nacelle
+		continue
+	end
+	node{:}.plotNode()
+end
+% Plot the elements.
+for elem = elemList(1:end)
+	if elem{:}.n1.pos(3) > maxHeight ...
+			|| elem{:}.n2.pos(3) > maxHeight  % ignore mast and nacelle
+		continue
+	end
+	elem{:}.plotElem()
+end
+% Dress the plot.
+xlabel("X/m");
+ylabel("Y/m");
+zlabel("Z/m");
+title("Subdivised structure");
+axis equal;
+grid;
+view(-35, 40);
+hold off;
+end
 
 %% 2. K and M
 
-	function [K_free, M_free] = set_global_matrices(SS)
-		% SET_GLOBAL_MATRICES  Set the global matrices of the free structure.
-		%
-		% Arguments:
-		%	SS   (struct)             -- Subdivised structure.
-		%	K_es {1xN (12x12 double)} -- Cell list of K_es matrices.
-		%	M_es {1xN (12x12 double)} -- Cell list of M_es matrices.
-		% Returns:
-		%	K_free  (nbDOFxnbDOF double) -- Global free stiffness matrix.
-		%	M_free  (nbDOFxnbDOF double) -- Global free mass      matrix.
+function [K_free, M_free] = buildGlobalMatrices(elemList, cmList, nDof)
+% BUILDGLOBALMATRICES  Set the global matrices of the free structure.
+%
+% Arguments:
+%	elemList {1xN Elem}             -- Cell list of elements.
+%	cmList   {1xN ConcentratedMass} -- Cell list of concentrated masses.
+%	nDof     (int)                  -- Number of structural DOFs.
+% Returns:
+%	K_free  (nDofxnDof double) -- Global free stiffness matrix.
+%	M_free  (nDofxnDof double) -- Global free mass      matrix.
 
-		K_free = zeros(SS.nbDOF);
-		M_free = zeros(SS.nbDOF);
+K_free = zeros(nDof);
+M_free = zeros(nDof);
 
-		% Add the beams.
-		for elem = SS.listElem
-			locel = [elem{:}.n1.dof, elem{:}.n2.dof];
-			K_free(locel, locel) = K_free(locel, locel) + elem{:}.K_es;
-			M_free(locel, locel) = M_free(locel, locel) + elem{:}.M_es;
-		end
+% Add the beams.
+for elem = elemList
+	locel = [elem{:}.n1.dof, elem{:}.n2.dof];
+	K_free(locel, locel) = K_free(locel, locel) + elem{:}.K_es;
+	M_free(locel, locel) = M_free(locel, locel) + elem{:}.M_es;
+end
 
-		% Add the concentrated masses.
-		for cm = BS.listCM
-			ind  = sub2ind(size(M_free), cm{:}.node.dof, cm{:}.node.dof);
-			M_free(ind)  = M_free(ind) + [repmat(cm{:}.mass, 1, 3), cm{:}.Jx, cm{:}.Iyy, cm{:}.Izz];
-		end
+% Add the concentrated masses.
+for cm = cmList
+	ind  = sub2ind(size(M_free), cm{:}.node.dof, cm{:}.node.dof);
+	M_free(ind)  = M_free(ind) + [repmat(cm{:}.mass, 1, 3), cm{:}.Jx, cm{:}.Iyy, cm{:}.Izz];
+end
 
-		allclose(K_free, K_free');
-		allclose(M_free, M_free');
+allclose(K_free, K_free');
+allclose(M_free, M_free');
+end
+
+function cstrMask = buildCstrMask(nodeList, nDof)
+% BUILDCSTRMASK  Create a bool array that index on constrained DOFs.
+%
+% Argument:
+%	nodeList {1xN Node} -- Cell list of nodes.
+%	nDof     (int)      -- Number of structural DOFs.
+% Return:
+%	cstrMask (1 x nDof bool) -- Index on constrained DOFs.
+
+cstrMask = false(1, nDof);
+
+for node = nodeList
+	if node{:}.cstr == "clamped"
+		cstrMask(node{:}.dof) = true;
 	end
+end
+end
 
-	function maskCstr = create_cstr_mask(SS)
-		% CREATE_CSTR_MASK  Create a bool array that index on constrained DOFs.
-		%
-		% Argument:
-		%	SS (struct) -- Subdivised structure.
-		% Return:
-		%	maskCstr (1 x nbDOF bool) -- Index on constrained DOFs.
+function [K, M] = applyBoundaryConditions(K_free, M_free, cstrMask)
+% APPLYBOUNDARYCONDITIONS  Apply the boundary conditions.
+%
+% arguments:
+%	K_free   (nDof x nDof double) -- Global free stiffness matrix.
+%	M_free   (nDof x nDof double) -- Global free mass matrix.
+%	cstrMask (1 x nDof bool)      -- Index on constrained DOFs.
+% Returns:
+%	K (nDof x nDof double) -- Global stiffness matrix.
+%	M (nDof x nDof double) -- Global mass matrix.
 
-		maskCstr = false(1, SS.nbDOF);
+K = K_free;
+M = M_free;
 
-		for node = SS.listNode
-			if node{:}.cstr == "clamped"
-				maskCstr(node{:}.dof) = true;
-			end
-		end
-	end
-
-	function [K, M] = apply_bc(K_free, M_free, maskCstr)
-		% APPLY_BC  Apply the boundary conditions.
-		%
-		% arguments:
-		%	K_free   (nbDOF x nbDOF double) -- Global free stiffness matrix.
-		%	M_free   (nbDOF x nbDOF double) -- Global free mass matrix.
-		%	maskCstr (1 x nbDOF bool)       -- Index on constrained DOFs.
-		% Returns:
-		%	K (nbDOF x nbDOF double) -- Global stiffness matrix.
-		%	M (nbDOF x nbDOF double) -- Global mass matrix.
-
-		K = K_free;
-		M = M_free;
-
-		% Supress rows and columns corresponding to clamped node DOFs.
-		K(:, maskCstr) = [];
-		M(:, maskCstr) = [];
-		K(maskCstr, :) = [];
-		M(maskCstr, :) = [];
-	end
+% Supress rows and columns corresponding to clamped node DOFs.
+K(:, cstrMask) = [];
+M(:, cstrMask) = [];
+K(cstrMask, :) = [];
+M(cstrMask, :) = [];
+end
 
 %% 3. Solve the eigenvalue problem
 
-	function SOL = get_solution(K, M, SS, maskCstr, nbMode, solver)
-		% GET_SOLUTION  Get the natural frequencies and corresponding modes.
-		%
-		% Arguments:
-		%	K        (nbDOF x nbDOF double) -- Global stiffness matrix.
-		%	M        (nbDOF x nbDOF double) -- Global mass matrix.
-		%	SS       (struct)               -- Subdivised structure.
-		%	maskCstr (1 x nbDOF bool)       -- Index on constrained DOFs.
-		%	nbMode   (int, default: 8)      -- Number of first modes desired.
-		%	solver   (char, default: 's')   -- Type of solver.
-		%	  'f'  -> Use the eig  solver (better for small full matrices).
-		%	  's' -> Use the eigs solver (better for large sparse matrices).
-		% Returns:
-		%	SOL (struct) -- Solution of the vibration problem, with fields:
-		%	  modes  (nbDOF x nbMode double) -- Modal displacement vectors.
-		%	  freqs  (1 x nbMode)            -- Natural frequencies, in Hertz.
-		%	  nbMode (int)                   -- Number of computed modes.
+function [frequencies, modes] = solveEigenvalueProblem(K, M, nDof, cstrMask, nMode, solver)
+% SOLVEEIGENVALUEPROBLEM  Get the natural frequencies and corresponding modes.
+%
+% Arguments:
+%	K        (nDof x nDof double) -- Global stiffness matrix.
+%	M        (nDof x nDof double) -- Global mass matrix.
+%	nDof     (int)                -- Number of structural DOFs.
+%	cstrMask (1 x nDof bool)      -- Index on constrained DOFs.
+%	nMode    (int)                -- Number of first modes desired.
+%	solver   (char)               -- Type of solver.
+%	  'f' -> Use the eig  solver (better for small full matrices).
+%	  's' -> Use the eigs solver (better for large sparse matrices).
+% Returns:
+%	frequencies (1 x nMode double)    -- Natural frequencies, in Hertz.
+%	modes       (nDof x nMode double) -- Modal displacement vectors.
 
-		if nargin < 5
-			nbMode = 8;
-			solver = 's';
-		end
+switch solver
+	case 's'
+		[frequencies, modes] = solveEigs();
+	case 'f'
+		[frequencies, modes] = solveEig();
+	otherwise
+		error("Cannot determine which solver to use. Specify either 'f' or 's'.");
+end
 
-		switch solver
-			case 's'
-				[freqs, modes] = solve_eigs();
-			case 'f'
-				[freqs, modes] = solve_eig();
-			otherwise
-				error("Unable to determine which solver to use. Specify either 'f' or 's'.");
-		end
+	function [frequencies, modes] = solveEigs()
+		% Solve the eigenvalue problem.
+		sigma = 'smallestabs';  % Could be advised to use a scalar value.
+		% TODO: try to make the 'isSymmetricDefinite' option working.
+		[eigvecs, eigvals] = eigs(K, M, nMode, sigma);
 
-		function [freqs, modes] = solve_eigs()
-			% Solve the eigenvalue problem.
-			sigma = 'smallestabs';  % Could be advised to use a scalar value.
-			% TODO: try to make the 'isSymmetricDefinite' option working.
-			[eigvecs, eigvals] = eigs(K, M, nbMode, sigma);
+		% Extract the natural frequencies.
+		frequencies = sqrt(diag(eigvals)) / (2*pi);
 
-			% Extract the natural frequencies.
-			freqs = sqrt(diag(eigvals)) / (2*pi);
-
-			% Build modal displacements: add clamped nodes.
-			modes = zeros(SS.nbDOF, nbMode);
-			modes(~maskCstr, :) = eigvecs;
-		end
-
-		function [freqs, modes] = solve_eig()
-			% Solve the eigenvalue problem.
-			[eigvecs, eigvals] = eig(K, M);
-
-			% Sort in ascending order.
-			[eigvals, ind] = sort(diag(eigvals));
-			eigvecs = eigvecs(:, ind);
-			% Extract the first natural frequencies.
-			freqs = sqrt(eigvals) / (2*pi);
-			freqs = freqs(1:nbMode);
-			% Extract corresponding eigvecs.
-			eigvecs = eigvecs(:, 1:nbMode);
-
-			% Build modal displacements: add clamped nodes.
-			modes = zeros(SS.nbDOF, nbMode);
-			modes(~maskCstr, :) = eigvecs;
-		end
-
-		SOL.freqs  = freqs;
-		SOL.modes  = modes;
-		SOL.nbMode = nbMode;
+		% Build modal displacements: add clamped nodes.
+		modes = zeros(nDof, nMode);
+		modes(~cstrMask, :) = eigvecs;
 	end
+
+	function [frequencies, modes] = solveEig()
+		% Solve the eigenvalue problem.
+		[eigvecs, eigvals] = eig(K, M);
+
+		% Sort in ascending order.
+		[eigvals, ind] = sort(diag(eigvals));
+		eigvecs = eigvecs(:, ind);
+		% Extract the first natural frequencies.
+		frequencies = sqrt(eigvals) / (2*pi);
+		frequencies = frequencies(1:nMode);
+		% Extract corresponding eigvecs.
+		eigvecs = eigvecs(:, 1:nMode);
+
+		% Build modal displacements: add clamped nodes.
+		modes = zeros(nDof, nMode);
+		modes(~cstrMask, :) = eigvecs;
+	end
+end
 
 %% 4. Eigenmodes plot
 
-	% TODO: Use proper shape function to interpolate the displacement field.
-	function plot_vibration_mode(SS, SOL)
-		% PLOT_VIBRATION_MODE  Get an overview of the vibration modes.
-		%
-		% Arguments:
-		%	SS  (struct) -- Subdivised structure.
-		%	SOL (struct) -- Solution of the vibration problem.
+% TODO: Use proper shape function to interpolate the displacement field.
+function plotVibrationMode(elemList, nNode, SOL, referenceLength)
+% PLOTVIBRATIONMODE  Get an overview of the vibration modes.
+%
+% Arguments:
+%	elemList        {1xN Node} -- Cell list of elements.
+%	nNode           (int)      -- Number of structural nodes.
+%	SOL             (struct)   -- Solution of the vibration problem.
+%	referenceLength (double)   -- Reference length to scale the mode.
 
-		figure("WindowStyle", "docked");
+figure("WindowStyle", "docked");
 
-		% Scale factor.
-		ref_length  = C.frame_height(end);
-		filter_tr   = reshape((1:3)' + Node.nbDOF * ((1:SS.nbNode)-1), 1, []);
-		max_def     = @(idxMode) max(abs(SOL.modes(filter_tr, idxMode)));
-		percent_def = 15;  % This gives a readable deformation.
-		get_scale   = @(idxMode) ref_length/max_def(idxMode) * percent_def*1e-2;
+% Scale factor.
+filterTranslationDof = reshape((1:3)' + Node.nDof * ((1:nNode)-1), 1, []);
+maximumDeformation = @(iMode) max(abs(SOL.modes(filterTranslationDof, iMode)));
+percentageDeformation = 15;  % This gives a readable deformation.
+computeScale = @(idxMode) referenceLength/maximumDeformation(idxMode) * percentageDeformation*1e-2;
 
-		for i = 1:SOL.nbMode
-			subplot(2, 4, i);
-			hold on;
+for i = 1:SOL.nMode
+	nGraphColumn = 4;
+	subplot(ceil(SOL.nMode/nGraphColumn), nGraphColumn, i);
+	hold on;
 
-			scale = get_scale(i);
-			for elem = SS.listElem
-				elem{:}.plotElem();  % pass `'Color', [0, 0, 0, 0.2]` for better clarity.
-				x = [elem{:}.n1.pos(1) + scale * SOL.modes(elem{:}.n1.dof(1), i),...
-					 elem{:}.n2.pos(1) + scale * SOL.modes(elem{:}.n2.dof(1), i)];
-				y = [elem{:}.n1.pos(2) + scale * SOL.modes(elem{:}.n1.dof(2), i), ...
-					 elem{:}.n2.pos(2) + scale * SOL.modes(elem{:}.n2.dof(2), i)];
-				z = [elem{:}.n1.pos(3) + scale * SOL.modes(elem{:}.n1.dof(3), i), ...
-					 elem{:}.n2.pos(3) + scale * SOL.modes(elem{:}.n2.dof(3), i)];
-				plot3(x, y, z, Color=[0.9290 0.6940 0.1250], LineWidth=2);
-			end
-
-			xlabel("X/m");
-			ylabel("Y/m");
-			zlabel("Z/m");
-			title(['f = ', num2str(SOL.freqs(i)), ' Hz']);
-			axis equal;
-			grid;
-			view(-35, 50);
-			hold off;
-		end
+	scale = computeScale(i);
+	for elem = elemList
+		elem{:}.plotElem();  % pass `'Color', [0, 0, 0, 0.2]` for better clarity.
+		x = [elem{:}.n1.pos(1) + scale * SOL.modes(elem{:}.n1.dof(1), i),...
+			elem{:}.n2.pos(1) + scale * SOL.modes(elem{:}.n2.dof(1), i)];
+		y = [elem{:}.n1.pos(2) + scale * SOL.modes(elem{:}.n1.dof(2), i), ...
+			elem{:}.n2.pos(2) + scale * SOL.modes(elem{:}.n2.dof(2), i)];
+		z = [elem{:}.n1.pos(3) + scale * SOL.modes(elem{:}.n1.dof(3), i), ...
+			elem{:}.n2.pos(3) + scale * SOL.modes(elem{:}.n2.dof(3), i)];
+		plot3(x, y, z, Color=[0.9290 0.6940 0.1250], LineWidth=2);
 	end
+
+	xlabel("X/m");
+	ylabel("Y/m");
+	zlabel("Z/m");
+	title(['f = ', num2str(SOL.frequencies(i)), ' Hz']);
+	axis equal;
+	grid;
+	view(-35, 50);
+	hold off;
+end
+end
 
 %% 5. Total mass and sanity checks
 
-	function varargout = rbm_checks(K_free, M_free, nbNode)
-		% RBM_CHECKS  Perform sanity checks based on rbm movement.
-		%
-		% This function uses a translation along the X-axis as a rigid
-		% body mode, to check that:
-		%   - the total mass of the structure is the same as the one calculated
-		%     with this RBM,
-		%   - the generalized forces required to maintain the structure in an
-		%     overall translational configuration is null.
-		%
-		% Arguments:
-		%	K_free (nbDOF x nbDOF double) -- Global free stiffness matrix.
-		%	M_free (nbDOF x nbDOF double) -- Global free mass      matrix.
-		%	nbNode (int)                  -- Number of structural nodes.
-		% Return:
-		%	mass_rbm (double, optional) -- Mass calculated from RBM [kg].
+function varargout = checkRbm(K_free, M_free, nNode, mass)
+% CHECKRBM  Perform sanity checks based on rbm movement.
+%
+% This function uses a translation along the X-axis as a rigid
+% body mode, to check that:
+%   - the total mass of the structure is the same as the one calculated
+%     with this RBM,
+%   - the generalized forces required to maintain the structure in an
+%     overall translational configuration is null.
+%
+% Arguments:
+%	K_free (nDof x nDof double) -- Global free stiffness matrix.
+%	M_free (nDof x nDof double) -- Global free mass      matrix.
+%	nNode (int)                 -- Number of structural nodes.
+% Return:
+%	massFromRbm (double, optional) -- Mass calculated from RBM [kg].
 
-		% Rigid translation of 1m along the X-axis.
-		u_rbm = repmat([1, 0, 0, 0, 0, 0]', nbNode, 1);
-		
-		% Mass calculated from this translation.
-		mass_rbm = u_rbm' * M_free * u_rbm;
-		% Forces calculated from this translation.
-		g_rbm = K_free * u_rbm;
+% Rigid translation of 1m along the X-axis.
+rbm = repmat([1, 0, 0, 0, 0, 0]', nNode, 1);
 
-		% Sanity checks.
-		allclose(BS.mass, mass_rbm);
-		% TODO: implement a proper check for g_rbm
+% Mass calculated from this translation.
+massFromRbm = rbm' * M_free * rbm;
+% Forces calculated from this translation.
+forceFromRbm = K_free * rbm;
 
-		% Return mass_rbm, if wanted.
-		varargout = cell(nargout, 1);
-		for k = 1:nargout
-			varargout{k} = mass_rbm;
-		end
-	end
+% Sanity checks.
+allclose(mass, massFromRbm);
+% TODO: implement a proper check for g_rbm
+
+% Return mass_rbm, if wanted.
+varargout = cell(nargout, 1);
+for k = 1:nargout
+	varargout{k} = massFromRbm;
+end
 end

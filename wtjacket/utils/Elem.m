@@ -10,12 +10,12 @@ classdef Elem
 		E   = 210e9;  % Young's modulus [N/m²].
 		nu  = 0.3;    % Poisson's ratio [-].
 		% Geometry
-		w_thick = 0.02;                     % Thickness of the cross-section walls [m].
-		d       (1, 1) double {mustBeReal}  % Cross-section diameter [m].
-		area    (1, 1) double {mustBeReal}  % Cross-section area [m²].
-		Iyy     (1, 1) double {mustBeReal}  % Area moment along the local y axis [m^4].
-		Izz     (1, 1) double {mustBeReal}  % Area moment along the local z axis [m^4].
-		Jx      (1, 1) double {mustBeReal}  % Area moment along the local x axis [m^4].
+		thickness = 0.02;                    % Thickness of the cross-section walls [m].
+		diameter (1, 1) double {mustBeReal}  % Cross-section diameter [m].
+		area     (1, 1) double {mustBeReal}  % Cross-section area [m²].
+		Iyy      (1, 1) double {mustBeReal}  % Area moment along the local y axis [m^4].
+		Izz      (1, 1) double {mustBeReal}  % Area moment along the local z axis [m^4].
+		Jx       (1, 1) double {mustBeReal}  % Area moment along the local x axis [m^4].
 	end
 
 	% NOTE:
@@ -39,12 +39,12 @@ classdef Elem
 	methods
 		function elem = Elem(d, n1, n2)
 			if nargin > 0
-				elem.d   = d;
-				elem.n1  = n1;
-				elem.n2  = n2;
+				elem.diameter = d;
+				elem.n1 = n1;
+				elem.n2 = n2;
 
-				elem.area = pi * elem.w_thick * (elem.d - elem.w_thick);
-				elem.Iyy = pi * (elem.d^4 - (elem.d - 2*elem.w_thick)^4) / 64;
+				elem.area = pi * elem.thickness * (elem.diameter - elem.thickness);
+				elem.Iyy = pi * (elem.diameter^4 - (elem.diameter - 2*elem.thickness)^4) / 64;
 				elem.Izz = elem.Iyy;
 				elem.Jx = elem.Iyy + elem.Izz;
 			end
@@ -95,12 +95,12 @@ classdef Elem
 			% Pre-terms computation for stiffness matrix.
 			% TODO: make sure of m(1) and m(2).
 			m = [
-				(elem.w_thick*(elem.d-elem.w_thick)) / 3,   ... % m(1)
-				(elem.w_thick*(elem.d-elem.w_thick)) / 6,   ... % m(2)
-				              1 / 3,                 1 / 6, ... % m(3), m(4)
-				            13 / 35,                9 / 70, ... % m(5), m(6)
-				elem.length*11 / 210, elem.length*13 / 420, ... % m(7), m(8)
-				 elem.length^2 / 105,  elem.length^2 / 140];    % m(9), m(10)
+				(elem.thickness*(elem.diameter-elem.thickness)) / 3, ... % m(1)
+				(elem.thickness*(elem.diameter-elem.thickness)) / 6, ... % m(2)
+				              1 / 3,                 1 / 6,           ... % m(3), m(4)
+				            13 / 35,                9 / 70,           ... % m(5), m(6)
+				elem.length*11 / 210, elem.length*13 / 420,           ... % m(7), m(8)
+				 elem.length^2 / 105,  elem.length^2 / 140];              % m(9), m(10)
 
 			% Elementary mass matrix in local axes.
 			M_el = elem.mass * [
@@ -148,14 +148,14 @@ classdef Elem
 			%
 			% Longitudinal axis: `ex`.
 			ex = elem.dir';
-			% Choose a reference direction: `ref_dir`.
+			% Choose a reference vector.
 			% This reference direction is defined as one of the three vectors
 			% of the structural base, so that it is not aligned with `ex`.
-			[~, ref_comp] = min(abs(ex));
-			ref_dir = zeros(size(ex));
-			ref_dir(ref_comp) = 1;
+			[~, referenceDirection] = min(abs(ex));
+			referenceVector = zeros(size(ex));
+			referenceVector(referenceDirection) = 1;
 			% Other axes are then simply constructed via cross products.
-			ey_dir = cross(ex, ref_dir);
+			ey_dir = cross(ex, referenceVector);
 			ey = ey_dir / norm(ey_dir);
 			ez = cross(ex, ey);
 			% Local basis.
