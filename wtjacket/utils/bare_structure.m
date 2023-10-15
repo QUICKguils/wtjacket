@@ -1,5 +1,5 @@
-function BS = initializeBareStructure(C, opts)
-% INITIALIZEBARESTRUCTURE  Definition of the wind turbine jacket structure.
+function BS = bare_structure(C, opts)
+% BARE_STRUCTURE  Definition of the wind turbine jacket structure.
 %
 % Argument:
 %	C    (struct)   -- Constant project quantities.
@@ -137,7 +137,7 @@ end
 %% Bare structure plot
 
 if contains(opts, 'p')
-	plotBareStructure(nodeList, elemList);
+	plot_bare_structure(nodeList, elemList);
 end
 
 %% Build return data structure.
@@ -152,8 +152,8 @@ BS.mass     = mass;
 
 end
 
-function plotBareStructure(nodeList, elemList)
-% PLOTBARESTRUCTURE  Get an overview of the bare structure.
+function plot_bare_structure(nodeList, elemList)
+% PLOT_BARE_STRUCTURE  Get an overview of the bare structure.
 %
 % Arguments:
 %	nodeList {1xN Node} -- Cell list of nodes.

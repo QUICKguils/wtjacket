@@ -40,42 +40,42 @@ close all;
 
 % 1. Subdivised structure
 
-BS = initializeBareStructure(C, opts);
-SS = subdiviseStructure(BS, sdiv);
+BS = bare_structure(C, opts);
+SS = subdivise_structure(BS, sdiv);
 
 if contains(opts, 'p')
-	plotSubdivisedStructure(SS.nodeList, SS.elemList, C.FRAME_HEIGHT(end));
+	plot_subdivised_structure(SS.nodeList, SS.elemList, C.FRAME_HEIGHT(end));
 end
 
 % 2. K and M
 
-[KM.K_free, KM.M_free] = buildGlobalMatrices(SS.elemList, BS.cmList, SS.nDof);
+[KM.K_free, KM.M_free] = build_global_matrices(SS.elemList, BS.cmList, SS.nDof);
 
-cstrMask = buildCstrMask(SS.nodeList, SS.nDof);
+cstrMask = build_cstr_mask(SS.nodeList, SS.nDof);
 
-[KM.K, KM.M] = applyBoundaryConditions(KM.K_free, KM.M_free, cstrMask);
+[KM.K, KM.M] = apply_boundary_conditions(KM.K_free, KM.M_free, cstrMask);
 
 % 3. Eigenvalue problem solving
 
-[SOL.frequencies, SOL.modes] = solveEigenvalueProblem(KM.K, KM.M, SS.nDof, cstrMask, nMode, 's');
+[SOL.frequencies, SOL.modes] = solve_eigenvalue_problem(KM.K, KM.M, SS.nDof, cstrMask, nMode, 's');
 SOL.nMode = nMode;  % Just to keep track of this user's input.
 
 % 4. Eigenmodes plot
 
 if contains(opts, 'p')
-	plotVibrationMode(SS.elemList, SS.nNode, SOL, C.FRAME_HEIGHT(end));
+	plot_vibration_mode(SS.elemList, SS.nNode, SOL, C.FRAME_HEIGHT(end));
 end
 
 % 5. Total mass and sanity checks
 
-SOL.massFromRbm = checkRbm(KM.K_free, KM.M_free, SS.nNode, BS.mass);
+SOL.massFromRbm = check_rbm(KM.K_free, KM.M_free, SS.nNode, BS.mass);
 
 end
 
 %% 1. Subdivised structure
 
-function SS = subdiviseStructure(BS, sdiv)
-% SUBDIVISESTRUCTURE  Subdivise the bare structure.
+function SS = subdivise_structure(BS, sdiv)
+% SUBDIVISE_STRUCTURE  Subdivise the bare structure.
 %
 % Argument:
 %	sdiv (int)    -- Number of subsivisions desired.
@@ -140,8 +140,8 @@ SS.nElem    = nElem;
 SS.nDof     = nNode * Node.nDof;
 end
 
-function plotSubdivisedStructure(nodeList, elemList, maxHeight)
-% PLOTSUBDIVISEDSTRUCTURE  Get an overview of the structure.
+function plot_subdivised_structure(nodeList, elemList, maxHeight)
+% PLOT_SUBDIVISED_STRUCTURE  Get an overview of the structure.
 %
 % Arguments:
 %	nodeList  {1xN Node} -- Cell list of nodes.
@@ -179,8 +179,8 @@ end
 
 %% 2. K and M
 
-function [K_free, M_free] = buildGlobalMatrices(elemList, cmList, nDof)
-% BUILDGLOBALMATRICES  Set the global matrices of the free structure.
+function [K_free, M_free] = build_global_matrices(elemList, cmList, nDof)
+% BUILD_GLOBAL_MATRICES  Set the global matrices of the free structure.
 %
 % Arguments:
 %	elemList {1xN Elem}             -- Cell list of elements.
@@ -210,8 +210,8 @@ allclose(K_free, K_free');
 allclose(M_free, M_free');
 end
 
-function cstrMask = buildCstrMask(nodeList, nDof)
-% BUILDCSTRMASK  Create a bool array that index on constrained DOFs.
+function cstrMask = build_cstr_mask(nodeList, nDof)
+% BUILD_CSTR_MASK  Create a bool array that index on constrained DOFs.
 %
 % Argument:
 %	nodeList {1xN Node} -- Cell list of nodes.
@@ -228,8 +228,8 @@ for node = nodeList
 end
 end
 
-function [K, M] = applyBoundaryConditions(K_free, M_free, cstrMask)
-% APPLYBOUNDARYCONDITIONS  Apply the boundary conditions.
+function [K, M] = apply_boundary_conditions(K_free, M_free, cstrMask)
+% APPLY_BOUNDARY_CONDITIONS  Apply the boundary conditions.
 %
 % arguments:
 %	K_free   (nDof x nDof double) -- Global free stiffness matrix.
@@ -251,8 +251,8 @@ end
 
 %% 3. Solve the eigenvalue problem
 
-function [frequencies, modes] = solveEigenvalueProblem(K, M, nDof, cstrMask, nMode, solver)
-% SOLVEEIGENVALUEPROBLEM  Get the natural frequencies and corresponding modes.
+function [frequencies, modes] = solve_eigenvalue_problem(K, M, nDof, cstrMask, nMode, solver)
+% SOLVE_EIGENVALUE_PROBLEM  Get the natural frequencies and corresponding modes.
 %
 % Arguments:
 %	K        (nDof x nDof double) -- Global stiffness matrix.
@@ -269,14 +269,14 @@ function [frequencies, modes] = solveEigenvalueProblem(K, M, nDof, cstrMask, nMo
 
 switch solver
 	case 's'
-		[frequencies, modes] = solveEigs();
+		[frequencies, modes] = solve_eigs();
 	case 'f'
-		[frequencies, modes] = solveEig();
+		[frequencies, modes] = solve_eig();
 	otherwise
 		error("Cannot determine which solver to use. Specify either 'f' or 's'.");
 end
 
-	function [frequencies, modes] = solveEigs()
+	function [frequencies, modes] = solve_eigs()
 		% Solve the eigenvalue problem.
 		sigma = 'smallestabs';  % Could be advised to use a scalar value.
 		% TODO: try to make the 'isSymmetricDefinite' option working.
@@ -290,7 +290,7 @@ end
 		modes(~cstrMask, :) = eigvecs;
 	end
 
-	function [frequencies, modes] = solveEig()
+	function [frequencies, modes] = solve_eig()
 		% Solve the eigenvalue problem.
 		[eigvecs, eigvals] = eig(K, M);
 
@@ -312,8 +312,8 @@ end
 %% 4. Eigenmodes plot
 
 % TODO: Use proper shape function to interpolate the displacement field.
-function plotVibrationMode(elemList, nNode, SOL, referenceLength)
-% PLOTVIBRATIONMODE  Get an overview of the vibration modes.
+function plot_vibration_mode(elemList, nNode, SOL, referenceLength)
+% PLOT_VIBRATION_MODE  Get an overview of the vibration modes.
 %
 % Arguments:
 %	elemList        {1xN Node} -- Cell list of elements.
@@ -367,8 +367,8 @@ end
 
 %% 5. Total mass and sanity checks
 
-function varargout = checkRbm(K_free, M_free, nNode, mass)
-% CHECKRBM  Perform sanity checks based on rbm movement.
+function varargout = check_rbm(K_free, M_free, nNode, mass)
+% CHECK_RBM  Perform sanity checks based on rbm movement.
 %
 % This function uses a translation along the X-axis as a rigid
 % body mode, to check that:

@@ -1,5 +1,5 @@
-function C = loadConstants
-% LOADCONSTANTS  Constants quantities used thourghout the project.
+function C = load_constants
+% LOAD_CONSTANTS  Constants quantities used thourghout the project.
 %
 % This function returns a structure that contains the constant
 % quantities used throughout the project.

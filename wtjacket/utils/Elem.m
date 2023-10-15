@@ -97,10 +97,10 @@ classdef Elem
 			m = [
 				(elem.thickness*(elem.diameter-elem.thickness)) / 3, ... % m(1)
 				(elem.thickness*(elem.diameter-elem.thickness)) / 6, ... % m(2)
-				              1 / 3,                 1 / 6,           ... % m(3), m(4)
-				            13 / 35,                9 / 70,           ... % m(5), m(6)
-				elem.length*11 / 210, elem.length*13 / 420,           ... % m(7), m(8)
-				 elem.length^2 / 105,  elem.length^2 / 140];              % m(9), m(10)
+				              1 / 3,                 1 / 6,          ... % m(3), m(4)
+				            13 / 35,                9 / 70,          ... % m(5), m(6)
+				elem.length*11 / 210, elem.length*13 / 420,          ... % m(7), m(8)
+				 elem.length^2 / 105,  elem.length^2 / 140];             % m(9), m(10)
 
 			% Elementary mass matrix in local axes.
 			M_el = elem.mass * [

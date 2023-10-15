@@ -13,10 +13,10 @@ optargs(1:numel(varargin)) = varargin;
 [sdivSet, nMode] = optargs{:};
 
 MatlabSolution = compute_matlab_solution(sdivSet, nMode);
-NxSolution = loadNxSolution(sdivSet, nMode);
+NxSolution = load_nx_solution(sdivSet, nMode);
 
-plotFrequencyConvergence(MatlabSolution);
-plotFrequencyConvergence(NxSolution);
+plot_frequency_convergence(MatlabSolution);
+plot_frequency_convergence(NxSolution);
 
 %plot_mass_convergence(MLSol);
 %plot_mass_convergence(NXSol);
@@ -68,8 +68,8 @@ Solution.nMode   = nMode;
 Solution.name    = 'Matlab';
 end
 
-function Solution = loadNxSolution(sdivSet, nMode)
-% LOADNXSOLUTION  Load the solution found via the NX simulations.
+function Solution = load_nx_solution(sdivSet, nMode)
+% LOAD_NX_SOLUTION  Load the solution found via the NX simulations.
 %
 % Arguments:
 %	sdivSet (1xN int) -- Set of desired number of subdivisions.
@@ -100,8 +100,8 @@ Solution.nMode   = nMode;
 Solution.name    = 'NX';
 end
 
-function plotFrequencyConvergence(Solution)
-% PLOTFREQUENCYCONVERGENCE  Generate convergence graphs for the frequencies.
+function plot_frequency_convergence(Solution)
+% PLOT_FREQUENCY_CONVERGENCE  Generate convergence graphs for the frequencies.
 %
 % Arguments:
 %	Solution (struct) -- Set of solution, with fields:
@@ -139,7 +139,7 @@ ylabel("Residual");
 grid;
 end
 
-function plotMassConvergence(Solution)
+function plot_mass_convergence(Solution)
 % TODO mass convergence analysis
 
 % Mass convergence
@@ -159,7 +159,7 @@ ylabel("Mass ratio [-]");
 grid;
 end
 
-function plotModeConvergence()
+function plot_mode_convergence()
 % Compute the relative differences between modes amplitudes
 mode_diff = zeros(numel(sdiv_serie)-1, BS.nbDOF, SOL.nbMode);
 norm_mode_diff = zeros(numel(sdiv_serie)-1, SOL.nbMode);
@@ -177,7 +177,7 @@ end
 MAC_arr = zeros(numel(sdiv_serie)-1, SOL.nMode, SOL.nMode);
 
 for i = 1:numel(sdiv_serie)-1
-	MAC_arr(i, :, :) = MAC(modes_serie(i, :, :), modes_serie(i+1, :, :), SOL);
+	MAC_arr(i, :, :) = compute_mac(modes_serie(i, :, :), modes_serie(i+1, :, :), SOL);
 end
 
 % NOTE pretty certain MAC(mi, mi+1) should converge to eye(nbMode)
@@ -202,8 +202,8 @@ ylabel("Relative difference mode norm");
 grid;
 end
 
-function mac = MAC(m1, m2, SOL)
-% MAC  Compute the Modal Assurance Criterion matrix.
+function mac = compute_mac(m1, m2, SOL)
+% COMPUTE_MAC  Compute the Modal Assurance Criterion matrix.
 %
 % Arguments
 %   m1   1 x nbMode x nbDOF

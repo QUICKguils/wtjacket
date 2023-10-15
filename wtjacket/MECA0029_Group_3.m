@@ -42,7 +42,7 @@ addpath(genpath(fullfile(rootDirectory, "wtjacket")));
 %% Execute the code
 
 % 0. Load the constants.
-C = loadConstants();
+C = load_constants();
 
 % 1. Modeling of the structure.
 [BS, SS, KM, SOL] = modeling(C, sdiv, nMode, opts);
