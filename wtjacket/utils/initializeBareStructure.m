@@ -1,5 +1,5 @@
-function BS = bareStructure(C, opts)
-% BARESTRUCTURE  Definition of the wind turbine jacket structure.
+function BS = initializeBareStructure(C, opts)
+% INITIALIZEBARESTRUCTURE  Definition of the wind turbine jacket structure.
 %
 % Argument:
 %	C    (struct)   -- Constant project quantities.

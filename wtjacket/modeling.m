@@ -40,8 +40,8 @@ close all;
 
 % 1. Subdivised structure
 
-BS = bareStructure(C, opts);
-SS = subdivisedStructure(BS, sdiv);
+BS = initializeBareStructure(C, opts);
+SS = subdiviseStructure(BS, sdiv);
 
 if contains(opts, 'p')
 	plotSubdivisedStructure(SS.nodeList, SS.elemList, C.FRAME_HEIGHT(end));
@@ -74,8 +74,8 @@ end
 
 %% 1. Subdivised structure
 
-function SS = subdivisedStructure(BS, sdiv)
-% SUBDIVISEDSTRUCTURE  Generate nodes and elements of the subdivised structure.
+function SS = subdiviseStructure(BS, sdiv)
+% SUBDIVISESTRUCTURE  Subdivise the bare structure.
 %
 % Argument:
 %	sdiv (int)    -- Number of subsivisions desired.
@@ -327,22 +327,30 @@ figure("WindowStyle", "docked");
 filterTranslationDof = reshape((1:3)' + Node.nDof * ((1:nNode)-1), 1, []);
 maximumDeformation = @(iMode) max(abs(SOL.modes(filterTranslationDof, iMode)));
 percentageDeformation = 15;  % This gives a readable deformation.
-computeScale = @(idxMode) referenceLength/maximumDeformation(idxMode) * percentageDeformation*1e-2;
+computeScale = @(iMode) referenceLength/maximumDeformation(iMode) * percentageDeformation*1e-2;
+
+% Plotting grid dimensions.
+maxCols = 4;
+if SOL.nMode < maxCols
+	nCols = SOL.nMode;
+else
+	nCols = maxCols;
+end
+nRows = ceil(SOL.nMode/nCols);
 
 for i = 1:SOL.nMode
-	nGraphColumn = 4;
-	subplot(ceil(SOL.nMode/nGraphColumn), nGraphColumn, i);
+	subplot(nRows, nCols, i);
 	hold on;
 
 	scale = computeScale(i);
 	for elem = elemList
 		elem{:}.plotElem();  % pass `'Color', [0, 0, 0, 0.2]` for better clarity.
 		x = [elem{:}.n1.pos(1) + scale * SOL.modes(elem{:}.n1.dof(1), i),...
-			elem{:}.n2.pos(1) + scale * SOL.modes(elem{:}.n2.dof(1), i)];
+			 elem{:}.n2.pos(1) + scale * SOL.modes(elem{:}.n2.dof(1), i)];
 		y = [elem{:}.n1.pos(2) + scale * SOL.modes(elem{:}.n1.dof(2), i), ...
-			elem{:}.n2.pos(2) + scale * SOL.modes(elem{:}.n2.dof(2), i)];
+			 elem{:}.n2.pos(2) + scale * SOL.modes(elem{:}.n2.dof(2), i)];
 		z = [elem{:}.n1.pos(3) + scale * SOL.modes(elem{:}.n1.dof(3), i), ...
-			elem{:}.n2.pos(3) + scale * SOL.modes(elem{:}.n2.dof(3), i)];
+			 elem{:}.n2.pos(3) + scale * SOL.modes(elem{:}.n2.dof(3), i)];
 		plot3(x, y, z, Color=[0.9290 0.6940 0.1250], LineWidth=2);
 	end
 
@@ -388,7 +396,7 @@ forceFromRbm = K_free * rbm;
 allclose(mass, massFromRbm);
 % TODO: implement a proper check for g_rbm
 
-% Return mass_rbm, if wanted.
+% Return the calculated mass, if wanted.
 varargout = cell(nargout, 1);
 for k = 1:nargout
 	varargout{k} = massFromRbm;
