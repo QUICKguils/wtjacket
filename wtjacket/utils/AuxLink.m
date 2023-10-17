@@ -6,9 +6,9 @@ classdef AuxLink < Elem
 			% AUXLINK  Construct an instance of AuxLink.
 
 			% Assigned diameter [m] (see project statement).
-			d = 0.6;
-			
-			al = al@Elem(d, n1, n2);
+			diameter = 0.6;
+
+			al = al@Elem(diameter, n1, n2);
 		end
 
 		function plotElem(al, varargin)
