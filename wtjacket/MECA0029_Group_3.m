@@ -12,8 +12,8 @@ function MECA0029_Group_3(varargin)
 %% Options setting
 
 % Check number of inputs.
-if numel(varargin) > 2
-	error('At most 2 optional inputs are required');
+if numel(varargin) > 3
+	error('At most 3 optional inputs are required');
 end
 
 % Set default value for optional inputs.
@@ -48,7 +48,7 @@ C = load_constants();
 [BS, SS, KM, SOL] = modeling(C, sdiv, nMode, opts);
 
 % 2. Transient response.
-transient(C, KM, SOL, opts);
+% transient(C, KM, SOL, opts);
 
 % 3. Reduction methods.
 reduction(opts);

@@ -57,8 +57,7 @@ cstrMask = build_cstr_mask(SS.nodeList, SS.nDof);
 
 % 3. Eigenvalue problem solving
 
-[SOL.frequencies, SOL.modes] = solve_eigenvalue_problem(KM.K, KM.M, SS.nDof, cstrMask, nMode, 's');
-SOL.nMode = nMode;  % Just to keep track of this user's input.
+SOL = solve_eigenvalue_problem(KM.K, KM.M, SS.nDof, cstrMask, nMode, 's');
 
 % 4. Eigenmodes plot
 
@@ -251,7 +250,7 @@ end
 
 %% 3. Solve the eigenvalue problem
 
-function [frequencies, modes] = solve_eigenvalue_problem(K, M, nDof, cstrMask, nMode, solver)
+function SOL = solve_eigenvalue_problem(K, M, nDof, cstrMask, nMode, solver)
 % SOLVE_EIGENVALUE_PROBLEM  Get the natural frequencies and corresponding modes.
 %
 % Arguments:
@@ -264,33 +263,36 @@ function [frequencies, modes] = solve_eigenvalue_problem(K, M, nDof, cstrMask, n
 %	  'f' -> Use the eig  solver (better for small full matrices).
 %	  's' -> Use the eigs solver (better for large sparse matrices).
 % Returns:
-%	frequencies (1 x nMode double)    -- Natural frequencies, in Hertz.
-%	modes       (nDof x nMode double) -- Modal displacement vectors.
-
+%	SOL (struct) -- Solution of the eigenvalue problem, with fields:
+%	  frequencyHertz (1 x nMode double)    -- Natural frequencies, in hertz.
+%	  frequencyRad   (1 x nMode double)    -- Natural frequencies, in rad/s.
+%	  mode           (nDof x nMode double) -- Modal displacement vectors.
+%	  nMode          (int)                 -- Number of computed first modes.
 switch solver
 	case 's'
-		[frequencies, modes] = solve_eigs();
+		[frequencyHertz, frequencyRad, mode] = solve_eigs(nMode);
 	case 'f'
-		[frequencies, modes] = solve_eig();
+		[frequencyHertz, frequencyRad,mode] = solve_eig(nMode);
 	otherwise
 		error("Cannot determine which solver to use. Specify either 'f' or 's'.");
 end
 
-	function [frequencies, modes] = solve_eigs()
+	function [frequencyHetz, frequencyRad, mode] = solve_eigs(nMode)
 		% Solve the eigenvalue problem.
 		sigma = 'smallestabs';  % Could be advised to use a scalar value.
 		% TODO: try to make the 'isSymmetricDefinite' option working.
 		[eigvecs, eigvals] = eigs(K, M, nMode, sigma);
 
 		% Extract the natural frequencies.
-		frequencies = sqrt(diag(eigvals)) / (2*pi);
+		frequencyRad  = sqrt(diag(eigvals));
+		frequencyHetz = frequencyRad / (2*pi);
 
 		% Build modal displacements: add clamped nodes.
-		modes = zeros(nDof, nMode);
-		modes(~cstrMask, :) = eigvecs;
+		mode = zeros(nDof, nMode);
+		mode(~cstrMask, :) = eigvecs;
 	end
 
-	function [frequencies, modes] = solve_eig()
+	function [frequencyHertz, frequencyRad, mode] = solve_eig(nMode)
 		% Solve the eigenvalue problem.
 		[eigvecs, eigvals] = eig(K, M);
 
@@ -298,15 +300,21 @@ end
 		[eigvals, ind] = sort(diag(eigvals));
 		eigvecs = eigvecs(:, ind);
 		% Extract the first natural frequencies.
-		frequencies = sqrt(eigvals) / (2*pi);
-		frequencies = frequencies(1:nMode);
+		frequencyRad   = sqrt(eigvals);
+		frequencyHertz = frequencyRad / (2*pi);
+		frequencyHertz = frequencyHertz(1:nMode);
 		% Extract corresponding eigvecs.
 		eigvecs = eigvecs(:, 1:nMode);
 
 		% Build modal displacements: add clamped nodes.
-		modes = zeros(nDof, nMode);
-		modes(~cstrMask, :) = eigvecs;
+		mode = zeros(nDof, nMode);
+		mode(~cstrMask, :) = eigvecs;
 	end
+
+	SOL.frequencyHertz = frequencyHertz;
+	SOL.frequencyRad   = frequencyRad;
+	SOL.mode           = mode;
+	SOL.nMode          = nMode;
 end
 
 %% 4. Eigenmodes plot
@@ -325,7 +333,7 @@ figure("WindowStyle", "docked");
 
 % Scale factor.
 filterTranslationDof = reshape((1:3)' + Node.nDof * ((1:nNode)-1), 1, []);
-maximumDeformation = @(iMode) max(abs(SOL.modes(filterTranslationDof, iMode)));
+maximumDeformation = @(iMode) max(abs(SOL.mode(filterTranslationDof, iMode)));
 percentageDeformation = 15;  % This gives a readable deformation.
 computeScale = @(iMode) referenceLength/maximumDeformation(iMode) * percentageDeformation*1e-2;
 
@@ -345,19 +353,19 @@ for i = 1:SOL.nMode
 	scale = computeScale(i);
 	for elem = elemList
 		elem{:}.plotElem();  % pass `'Color', [0, 0, 0, 0.2]` for better clarity.
-		x = [elem{:}.n1.pos(1) + scale * SOL.modes(elem{:}.n1.dof(1), i),...
-			 elem{:}.n2.pos(1) + scale * SOL.modes(elem{:}.n2.dof(1), i)];
-		y = [elem{:}.n1.pos(2) + scale * SOL.modes(elem{:}.n1.dof(2), i), ...
-			 elem{:}.n2.pos(2) + scale * SOL.modes(elem{:}.n2.dof(2), i)];
-		z = [elem{:}.n1.pos(3) + scale * SOL.modes(elem{:}.n1.dof(3), i), ...
-			 elem{:}.n2.pos(3) + scale * SOL.modes(elem{:}.n2.dof(3), i)];
+		x = [elem{:}.n1.pos(1) + scale * SOL.mode(elem{:}.n1.dof(1), i),...
+			 elem{:}.n2.pos(1) + scale * SOL.mode(elem{:}.n2.dof(1), i)];
+		y = [elem{:}.n1.pos(2) + scale * SOL.mode(elem{:}.n1.dof(2), i), ...
+			 elem{:}.n2.pos(2) + scale * SOL.mode(elem{:}.n2.dof(2), i)];
+		z = [elem{:}.n1.pos(3) + scale * SOL.mode(elem{:}.n1.dof(3), i), ...
+			 elem{:}.n2.pos(3) + scale * SOL.mode(elem{:}.n2.dof(3), i)];
 		plot3(x, y, z, Color=[0.9290 0.6940 0.1250], LineWidth=2);
 	end
 
 	xlabel("X/m");
 	ylabel("Y/m");
 	zlabel("Z/m");
-	title(['f = ', num2str(SOL.frequencies(i)), ' Hz']);
+	title(['f = ', num2str(SOL.frequencyHertz(i)), ' Hz']);
 	axis equal;
 	grid;
 	view(-35, 50);
