@@ -118,8 +118,17 @@ elemList = {
 	}';
 
 %% Concentrated masses
+% Only one CM: the nacelle.
 
-cmList = {ConcentratedMass(nodeList{22})};  % Only one CM: the nacelle.
+cmList = {ConcentratedMass(nodeList{22})};
+
+%% Loads
+% Only the assigned load, for the transient part.
+
+loadAmplitude    = C.TAIL_MASS*C.TAIL_SPEED*C.MOMENTUM_TRANSFER / C.IMPACT_DURATION;
+loadDirection    = [cosd(C.FORCE_DIRECTION), -sind(C.FORCE_DIRECTION), 0];
+
+loadList = {Load(nodeList{18}, loadDirection, loadAmplitude, C.LOAD_FREQUENCY_HERTZ)};
 
 %% Total mass
 
@@ -145,6 +154,7 @@ end
 BS.nodeList = nodeList;
 BS.elemList = elemList;
 BS.cmList   = cmList;
+BS.loadList = loadList;
 BS.nNode    = numel(nodeList);
 BS.nElem    = numel(elemList);
 BS.nDof     = BS.nNode * Node.nDof;

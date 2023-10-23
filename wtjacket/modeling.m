@@ -67,7 +67,7 @@ end
 
 % 5. Total mass and sanity checks
 
-SOL.massFromRbm = check_rbm(KM.K_free, KM.M_free, SS.nNode, BS.mass);
+SOL.massFromRbm = check_rbm(KM.M_free, SS.nNode, BS.mass);
 
 end
 
@@ -315,6 +315,7 @@ end
 	SOL.frequencyRad   = frequencyRad;
 	SOL.mode           = mode;
 	SOL.nMode          = nMode;
+	SOL.nDof           = nDof;
 end
 
 %% 4. Eigenmodes plot
@@ -375,20 +376,17 @@ end
 
 %% 5. Total mass and sanity checks
 
-function varargout = check_rbm(K_free, M_free, nNode, mass)
-% CHECK_RBM  Perform sanity checks based on rbm movement.
+function varargout = check_rbm(M_free, nNode, mass)
+% CHECK_RBM  Perform sanity check based on rbm movement.
 %
-% This function uses a translation along the X-axis as a rigid
-% body mode, to check that:
-%   - the total mass of the structure is the same as the one calculated
-%     with this RBM,
-%   - the generalized forces required to maintain the structure in an
-%     overall translational configuration is null.
+% This function uses a translation along the X-axis as a rigid body
+% mode, to check that the total mass of the structure is the same as the
+% one calculated with this RBM.
 %
 % Arguments:
-%	K_free (nDof x nDof double) -- Global free stiffness matrix.
-%	M_free (nDof x nDof double) -- Global free mass      matrix.
-%	nNode (int)                 -- Number of structural nodes.
+%	M_free (nDof x nDof double) -- Global free mass matrix.
+%	nNode  (int)                -- Number of structural nodes.
+%	mass   (double)             -- Mass of the entire structure [kg].
 % Return:
 %	massFromRbm (double, optional) -- Mass calculated from RBM [kg].
 
@@ -397,12 +395,9 @@ rbm = repmat([1, 0, 0, 0, 0, 0]', nNode, 1);
 
 % Mass calculated from this translation.
 massFromRbm = rbm' * M_free * rbm;
-% Forces calculated from this translation.
-forceFromRbm = K_free * rbm;
 
 % Sanity checks.
 allclose(mass, massFromRbm);
-% TODO: implement a proper check for g_rbm
 
 % Return the calculated mass, if wanted.
 varargout = cell(nargout, 1);

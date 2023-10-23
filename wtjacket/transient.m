@@ -1,110 +1,167 @@
-function transient(Constant, ModelingGlobalMatrix, ModelingSolution, SubdivisedStructure, opts)
-% TRANSIENT  Transient response due to a collision.
+function transient(C, BS, SS, KM, SOL, opts)
+% TRANSIENT  Transient response due to a harmonic excitation.
 
-if ModelingSolution.nMode < 8
-	warning('wtjacket:NotEnoughModes', ...
-		['Not enough modes were computed in modeling part.\n' ...
-		'Transient part needs to have at least the first eight modes at its disposal.']);
-	return
+% 1. Set the time discretization
+
+timeSample = 0:0.001:10;
+TimeSet = set_discrete_time(timeSample);
+
+% 2. Set the proportional damping parameters
+
+Damping = set_damping_parameters(C.DAMPING_RATIO, C.DAMPING_RATIO, SOL.frequencyRad, KM);
+
+% 3. Compute the modal superposition
+
+% Choose the load to study.
+% NOTE: for the sake of completeness.
+% By the way, only one load was assigned in this project.
+ThisLoad = BS.loadList{1};
+% Create the time-discretized load.
+loadSet = ThisLoad.create_load_set(SOL.nDof, TimeSet.sample);
+
+k = SOL.nMode;
+ModSup = modal_superposition(k, SOL, KM, Damping.eps, loadSet, TimeSet, C.INITIAL_CONDITIONS);
+
+% 4. Compute the displacements
+
+DisplSetDispl = mode_displacement(ModSup.nu, SOL.mode);
+% DisplSetAccel = mode_acceleration(GlobMat.K_free, loadSet, ModSol.mode, ModSup.phi, ModSol.frequencyRad);
+
+% 5. Plot the displacements
+
+if contains(opts, 'p')
+	plot_displacement(DisplSetDispl, TimeSet, [18, 22], ThisLoad.direction, SS.nodeList, k);
+	% plot_displacement(DisplSetAccel);
 end
 
-[eps, ~] = set_damping_matrix(Constant.DAMPING_RATIO, ...
-	Constant.DAMPING_RATIO, ...
-	ModelingSolution.frequencyRad, ...
-	ModelingGlobalMatrix.K, ...
-	ModelingGlobalMatrix.M);
-
-% TODO: probably put this constant in bare_structure.m or load_constant.m
-IMPACT_NODE_LABEL = 18;
-TIME_SAMPLE = 0:0.02:10;
-load = create_load(Constant, SubdivisedStructure, IMPACT_NODE_LABEL, TIME_SAMPLE);
-
-% TODO: register ICs in Constants.
-ModalSuperposition = modal_superposition(ModelingSolution, ModelingGlobalMatrix, eps, load, TIME_SAMPLE, [0, 0]);
-q = mode_displacement(ModelingSolution.nMode, ModalSuperposition.nu, ModelingSolution.mode);
-plot(TIME_SAMPLE ,q(SubdivisedStructure.nodeList{18}.dof(1), :));
-hold on;
-plot(TIME_SAMPLE ,q(SubdivisedStructure.nodeList{18}.dof(2), :));
 end
 
-function [eps, C] = set_damping_matrix(eps1, eps2, w0, K, M)
+%% Set the time discretization
+
+function TimeSet = set_discrete_time(timeSample)
+% SET_DISCRETE_TIME  Set the time discretization.
+
+% Ensure the time vector is in the expected shape.
+timeSample = reshape(timeSample, 1, []);
+
+% TODO: see if start and end fields are used.
+TimeSet.sample = timeSample;
+TimeSet.steps  = [diff(timeSample), timeSample(end)-timeSample(end-1)];
+TimeSet.start  = timeSample(1);
+TimeSet.end    = timeSample(end);
+TimeSet.numel  = numel(timeSample);
+end
+
+%% Set the proportional damping parameters
+
+function Damping = set_damping_parameters(eps1, eps2, w0, KM)
 % SET_DAMPING_MATRIX  Set the damping matrix, assuming a proportional damping.
 %
 % Arguments:
 %	eps1, eps2 (double)
 %	  Damping ratio of the first two modes.
-%	frequencies (1 x nMode double)
-%	  Natural frequencies of the asociated conservative system, in Hertz.
-
-% Determine the damping ratios for the first eight modes.
+%	w0 (1 x nMode double)
+%	  Natural frequencies of the asociated conservative system [rad/s].
+%	KM (struct)
+%	  Global structural matrices.
+% Return:
+%	Damping (struct)
+%	  Damping parameters of the proportional damping model, with fields:
+%	    eps (1 x Nmode double) -- Damping ratios of the first modes.
+%	    C   (N x N double)     -- Damping matrix.
+%
 % See reference book, p.156.
 
 a = 2             * (w0(1)*eps1 - w0(2)*eps2) / (w0(1)^2 - w0(2)^2);
 b = 2*w0(1)*w0(2) * (w0(1)*eps2 - w0(2)*eps1) / (w0(1)^2 - w0(2)^2);
 
-eps = 0.5 * (a*w0 + b./w0);
-C   = a*K + b*M;
+Damping.eps = 0.5 * (a*w0 + b./w0);
+Damping.C   = a*KM.K + b*KM.M;
 end
 
+%% Compute the modal superposition
 
-function load = create_load(C, SS, impactNodeLabel, t)
-% TODO: make it more general.
-% Allow user to enter multiple excited node, force directions and amplitudes.
+function ModalSuperposition = modal_superposition(k, SOL, KM, eps, loadSet, TimeSet, initialConditions)
+% MODAL_SUPERPOSITION  Compute the modal superposition, from the first vibration modes.
 
-% Assume an excitation force F = A*sin(w*t).
-% TODO: make sure of this chunck of code.
-amplitude = 0.5 * C.TAIL_MASS*C.TAIL_SPEED*C.MOMENTUM_TRANSFER / C.IMPACT_DURATION;
-frequencyRad = C.LOAD_FREQUENCY * 2*pi;
-force  = @(t) amplitude*sin(frequencyRad*t);
-forceX = @(t)  force(t) * sind(45);
-forceY = @(t) -force(t) * sind(45);
-
-load = zeros(SS.nDof, numel(t));
-load(SS.nodeList{impactNodeLabel}.dof(1), :) = forceX(t);
-load(SS.nodeList{impactNodeLabel}.dof(2), :) = forceY(t);
+if k > SOL.nMode
+	warning("Only the first " + num2str(SOL.nMode) + " modes have been computed.")
+	k = SOL.nMode;
 end
 
-function ModalSuperposition = modal_superposition(SOL, KM, eps, load, t, initialConditions)
-% return the nu and the phi.
-
-% TODO: determine these IC.
-% Initial conditions.
 A = initialConditions(1);
 B = initialConditions(2);
 
-mu  = zeros(SOL.nMode, 1);
-phi = zeros(SOL.nMode, length(t));
-wd  = zeros(SOL.nMode, 1);
-h   = zeros(SOL.nMode, length(t));
-nu  = zeros(SOL.nMode, length(t));
+mu  = zeros(k, 1);
+phi = zeros(k, TimeSet.numel);
+wd  = zeros(k, 1);
+h   = zeros(k, TimeSet.numel);
+nu  = zeros(k, TimeSet.numel);
 
-for r = 1:SOL.nMode
-
-	mu(r) = SOL.mode(:, r)'*KM.M_free*SOL.mode(:, r);
-	% TODO: check mult dims when p(t) is done.
-	phi(r, :) = SOL.mode(:, r)' * load / mu(r);
-
-	wd(r) = sqrt(1-eps(r)^2)*SOL.frequencyRad(r);
-	h(r, :) = 1/wd(r) .* exp(-eps(r)*wd(r)*t) .* sin(wd(r)*t);
-	nu_transient = exp(-eps(r)*wd(r)*t) .* (A*cos(wd(r)*t) + B*sin(wd(r)*t));
-	nu_permanent = conv(phi(r, :), h(r, :), 'same');
-	% nu_permanent = arrayfun(@(t) integral(@(s) phi{r}(s).*h{r}(t-s), 0, t), tSample);
-	nu(r, :) = nu_transient + nu_permanent;
+for r = 1:k
+	mu(r)        = SOL.mode(:, r)'*KM.M_free*SOL.mode(:, r);
+	phi(r, :)    = SOL.mode(:, r)' * loadSet / mu(r);
+	wd(r)        = sqrt(1-eps(r)^2) * SOL.frequencyRad(r);
+	h(r, :)      = 1/wd(r) .* exp(-eps(r)*wd(r)*TimeSet.sample) .* sin(wd(r)*TimeSet.sample);
+	nuTransient  = exp(-eps(r)*wd(r)*TimeSet.sample) .* (A*cos(wd(r)*TimeSet.sample) + B*sin(wd(r)*TimeSet.sample));
+	discreteConv = conv(phi(r, :), h(r, :));
+	nuPermanent  = discreteConv(1:length(TimeSet.sample)) .* TimeSet.steps;
+	nu(r, :)     = nuTransient + nuPermanent;
 end
 
+% TODO: see if rly useful to store h, wd and mu.
 ModalSuperposition.phi = phi;
 ModalSuperposition.nu  = nu;
-
+ModalSuperposition.mu  = mu;
+ModalSuperposition.wd  = wd;
+ModalSuperposition.h   = h;
 end
 
-function q = mode_displacement(k, nu, modes)
-% Compute q with the mode displacement method.
-q = zeros(size(modes, 1), 1);
-for r = 1:k
-	q = q + modes(:, r) * nu(r, :);
-end
+%% Compute the displacements
+
+function DisplSet = mode_displacement(nu, modes)
+% MODE_DISPLACEMENT  Compute the displacements with the mode displacement method.
+
+DisplSet.q = modes * nu;
+DisplSet.method = 'mode displacement';
 end
 
-function q = mode_acceleration(ModalSuperposition)
-% Compute q with the mode acceleration method.
+% TODO: this is a non-working draft
+function DisplSet = mode_acceleration(K, loadSet, nu, mode, phi, w)
+% MODE_ACCELERATION  Compute the displacements with the mode acceleration method.
+
+completeStaticResponse = K \ loadSet;
+partialStaticResponse = phi * mode ./ w;
+
+DisplSet.q = mode * nu + completeStaticResponse -partialStaticResponse;
+DisplSet.method = 'mode acceleration';
+end
+
+%% Plot the displacements
+
+function plot_displacement(DisplSet, TimeSet, nodeLabels, dir, nodeList, k)
+% PLOT_DISPLACEMENT  Plot the time evolution of the displacements.
+
+allclose(norm(dir), 1);
+
+figure("WindowStyle", "docked");
+
+nNode = numel(nodeLabels);
+for i = 1:nNode
+	qX = DisplSet.q(nodeList{nodeLabels(i)}.dof(1), :) * dir(1);
+	qY = DisplSet.q(nodeList{nodeLabels(i)}.dof(2), :) * dir(2);
+	qZ = DisplSet.q(nodeList{nodeLabels(i)}.dof(3), :) * dir(3);
+
+	qDir = qX + qY + qZ;
+
+	subplot(nNode, 1, i);
+	plot(TimeSet.sample, qDir);
+	xlabel("Time (s)");
+	ylabel("Displacement (dir: [" + num2str(dir, '%.3f  ') + "])");
+	title('Transient response', ...
+		['(node: ', num2str(nodeLabels(i)), ...
+		', method: ', DisplSet.method, ...
+		', order: ', num2str(k), ')']);
+	grid;
+end
 end
