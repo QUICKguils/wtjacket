@@ -10,6 +10,7 @@ function BS = bare_structure(C, opts)
 %	BS (struct) -- Bare structure, with fields:
 %	  nodeList {1xN Node}             -- Cell list of nodes.
 %	  elemList {1xN Elem}             -- Cell list of elements.
+%	  loadList {1xN Load}             -- Cell list of loads.
 %	  cmList   {1xN ConcentratedMass} -- Cell list of concentrated masses.
 %	  nNode    (int)                  -- Number of nodes.
 %	  nElem    (int)                  -- Number of elements.

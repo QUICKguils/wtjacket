@@ -19,6 +19,7 @@ ThisLoad = BS.loadList{1};
 % Create the time-discretized load.
 loadSet = ThisLoad.create_load_set(SOL.nDof, TimeSet.sample);
 
+% TODO: this should be passed as transient() argument.
 k = SOL.nMode;
 ModSup = modal_superposition(k, SOL, KM, Damping.eps, loadSet, TimeSet, C.INITIAL_CONDITIONS);
 
@@ -99,7 +100,7 @@ h   = zeros(k, TimeSet.numel);
 nu  = zeros(k, TimeSet.numel);
 
 for r = 1:k
-	mu(r)        = SOL.mode(:, r)'*KM.M_free*SOL.mode(:, r);
+	mu(r)        = SOL.mode(:, r)' * KM.M_free * SOL.mode(:, r);
 	phi(r, :)    = SOL.mode(:, r)' * loadSet / mu(r);
 	wd(r)        = sqrt(1-eps(r)^2) * SOL.frequencyRad(r);
 	h(r, :)      = 1/wd(r) .* exp(-eps(r)*wd(r)*TimeSet.sample) .* sin(wd(r)*TimeSet.sample);

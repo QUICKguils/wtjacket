@@ -10,13 +10,14 @@ function [BS, SS, KM, SOL] = modeling(C, sdiv, nMode, opts)
 %	  'p' -> Enable plots creation.
 % Return:
 %	BS (struct) -- Bare structure, with fields:
-%		nodeList {1xN Node}             -- Cell list of nodes.
-%		elemList {1xN Elem}             -- Cell list of elements.
-%		cmList   {1xN ConcentratedMass} -- Cell list of concentrated masses.
-%		nNode    (int)                  -- Number of nodes.
-%		nElem    (int)                  -- Number of elements.
-%		nDof     (int)                  -- Number of DOFs.
-%		mass     (int)                  -- Total mass of the structure [kg].
+%	  nodeList {1xN Node}             -- Cell list of nodes.
+%	  elemList {1xN Elem}             -- Cell list of elements.
+%	  cmList   {1xN ConcentratedMass} -- Cell list of concentrated masses.
+%	  loadList {1xN Load}             -- Cell list of loads.
+%	  nNode    (int)                  -- Number of nodes.
+%	  nElem    (int)                  -- Number of elements.
+%	  nDof     (int)                  -- Number of DOFs.
+%	  mass     (int)                  -- Total mass of the structure [kg].
 %	SS (struct) -- Subdivised structure, with fields:
 %	  nodeList {1xN Node} -- Cell list of nodes.
 %	  elemList {1xN Elem} -- Cell list of elements.
@@ -28,11 +29,13 @@ function [BS, SS, KM, SOL] = modeling(C, sdiv, nMode, opts)
 %	  KM.M_free (nDof x nDof) -- Global mass     matrix, without constraints.
 %	  KM.K      (N x N)       -- Global siffness matrix, with    constraints.
 %	  KM.M      (N x N)       -- Global mass     matrix, with    constraints.
-%	SOL (struct) -- Solution of the vibration problem, with fields:
-%	  modes       (nDof x nbMode double) -- Modal displacement vectors.
-%	  freqs       (1 x nbMode)           -- Natural frequencies, in Hertz.
-%	  nMode       (int)                  -- Number of computed modes.
-%	  massFromRbm (double)               -- Mass calculated from RBM [kg].
+%	SOL (struct) -- Solution of the eigenvalue problem, with fields:
+%	  frequencyHertz (1 x nMode double)    -- Natural frequencies [Hz].
+%	  frequencyRad   (1 x nMode double)    -- Natural frequencies [rad/s].
+%	  mode           (nDof x nMode double) -- Modal displacement vectors.
+%	  nMode          (int)                 -- Number of computed first modes.
+%	  nDof           (int)                 -- Number of DOFs.
+%	  massFromRbm    (double)              -- Mass calculated from RBM [kg].
 
 % Reset class internal states, close previous plots.
 clear Node Elem;
@@ -268,6 +271,7 @@ function SOL = solve_eigenvalue_problem(K, M, nDof, cstrMask, nMode, solver)
 %	  frequencyRad   (1 x nMode double)    -- Natural frequencies, in rad/s.
 %	  mode           (nDof x nMode double) -- Modal displacement vectors.
 %	  nMode          (int)                 -- Number of computed first modes.
+%	  nDof           (int)                 -- Number of DOFs.
 switch solver
 	case 's'
 		[frequencyHertz, frequencyRad, mode] = solve_eigs(nMode);
