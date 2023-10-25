@@ -25,10 +25,11 @@ function [BS, SS, KM, SOL] = modeling(C, sdiv, nMode, opts)
 %	  nElem   (int)       -- Number of elements.
 %	  nDof    (int)       -- Number of DOFs.
 %	KM (struct) -- Global structural matrices, with fields:
-%	  KM.K_free (nDof x nDof) -- Global siffness matrix, without constraints.
-%	  KM.M_free (nDof x nDof) -- Global mass     matrix, without constraints.
-%	  KM.K      (N x N)       -- Global siffness matrix, with    constraints.
-%	  KM.M      (N x N)       -- Global mass     matrix, with    constraints.
+%	  K_free   (nDofxnDof double) -- Global siffness matrix, without constraints.
+%	  M_free   (nDofxnDof double) -- Global mass     matrix, without constraints.
+%	  K        (NxN double)       -- Global siffness matrix, with    constraints.
+%	  M        (NxN double)       -- Global mass     matrix, with    constraints.
+%	  cstrMask (1xnDof bool)      -- Index on constrained DOFs.
 %	SOL (struct) -- Solution of the eigenvalue problem, with fields:
 %	  frequencyHertz (1 x nMode double)    -- Natural frequencies [Hz].
 %	  frequencyRad   (1 x nMode double)    -- Natural frequencies [rad/s].
@@ -39,7 +40,6 @@ function [BS, SS, KM, SOL] = modeling(C, sdiv, nMode, opts)
 
 % Reset class internal states, close previous plots.
 clear Node Elem;
-close all;
 
 % 1. Subdivised structure
 
@@ -54,13 +54,13 @@ end
 
 [KM.K_free, KM.M_free] = build_global_matrices(SS.elemList, BS.cmList, SS.nDof);
 
-cstrMask = build_cstr_mask(SS.nodeList, SS.nDof);
+KM.cstrMask = build_cstr_mask(SS.nodeList, SS.nDof);
 
-[KM.K, KM.M] = apply_boundary_conditions(KM.K_free, KM.M_free, cstrMask);
+[KM.K, KM.M] = apply_boundary_conditions(KM.K_free, KM.M_free, KM.cstrMask);
 
 % 3. Eigenvalue problem solving
 
-SOL = solve_eigenvalue_problem(KM.K, KM.M, SS.nDof, cstrMask, nMode, 's');
+SOL = solve_eigenvalue_problem(KM.K, KM.M, SS.nDof, KM.cstrMask, nMode, 's');
 
 % 4. Eigenmodes plot
 
@@ -241,14 +241,9 @@ function [K, M] = apply_boundary_conditions(K_free, M_free, cstrMask)
 %	K (nDof x nDof double) -- Global stiffness matrix.
 %	M (nDof x nDof double) -- Global mass matrix.
 
-K = K_free;
-M = M_free;
-
 % Supress rows and columns corresponding to clamped node DOFs.
-K(:, cstrMask) = [];
-M(:, cstrMask) = [];
-K(cstrMask, :) = [];
-M(cstrMask, :) = [];
+K = K_free(~cstrMask, ~cstrMask);
+M = M_free(~cstrMask, ~cstrMask);
 end
 
 %% 3. Solve the eigenvalue problem

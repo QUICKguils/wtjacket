@@ -27,6 +27,9 @@ optargs(1:numel(varargin)) = varargin;
 
 %% Set program initial state
 
+% Close previous plots.
+close all;
+
 % Find the root directory of the project.
 rootDirectory = fullfile(fileparts(mfilename('fullpath')), "..");
 

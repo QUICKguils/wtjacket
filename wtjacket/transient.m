@@ -25,14 +25,15 @@ ModSup = modal_superposition(k, SOL, KM, Damping.eps, loadSet, TimeSet, C.INITIA
 
 % 4. Compute the displacements
 
-DisplSetDispl = mode_displacement(ModSup.nu, SOL.mode);
-% DisplSetAccel = mode_acceleration(GlobMat.K_free, loadSet, ModSol.mode, ModSup.phi, ModSol.frequencyRad);
+DisplSetDm = mode_displacement(ModSup.nu, SOL.mode);
+DisplSetAm = mode_acceleration(KM, loadSet,  SOL, ModSup);
 
 % 5. Plot the displacements
 
 if contains(opts, 'p')
-	plot_displacement(DisplSetDispl, TimeSet, [18, 22], ThisLoad.direction, SS.nodeList, k);
-	% plot_displacement(DisplSetAccel);
+	lookupNodeLabels = [18, 22];
+	plot_displacement(DisplSetDm, TimeSet, lookupNodeLabels, ThisLoad.direction, SS.nodeList, k);
+	plot_displacement(DisplSetAm, TimeSet, lookupNodeLabels, ThisLoad.direction, SS.nodeList, k);
 end
 
 end
@@ -120,21 +121,25 @@ end
 
 %% Compute the displacements
 
-function DisplSet = mode_displacement(nu, modes)
+function DisplSet = mode_displacement(nu, mode)
 % MODE_DISPLACEMENT  Compute the displacements with the mode displacement method.
 
-DisplSet.q = modes * nu;
+DisplSet.q = mode * nu;
 DisplSet.method = 'mode displacement';
 end
 
 % TODO: this is a non-working draft
-function DisplSet = mode_acceleration(K, loadSet, nu, mode, phi, w)
+function DisplSet = mode_acceleration(KM, loadSet, SOL, MS)
 % MODE_ACCELERATION  Compute the displacements with the mode acceleration method.
 
-completeStaticResponse = K \ loadSet;
-partialStaticResponse = phi * mode ./ w;
+loadSetCstr = loadSet(~KM.cstrMask, :);
+completeStaticResponseCstr = KM.K \ loadSetCstr;
+completeStaticResponse = zeros(size(loadSet));
+completeStaticResponse(~KM.cstrMask, :) = completeStaticResponseCstr;
 
-DisplSet.q = mode * nu + completeStaticResponse -partialStaticResponse;
+partialStaticResponse  = SOL.mode * (MS.phi ./ SOL.frequencyRad.^2);
+
+DisplSet.q = SOL.mode * MS.nu + completeStaticResponse -partialStaticResponse;
 DisplSet.method = 'mode acceleration';
 end
 
