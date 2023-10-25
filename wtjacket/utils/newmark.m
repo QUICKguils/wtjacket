@@ -32,7 +32,6 @@ gamma = 0.5;
 
 % Preallocations.
 nDof = size(M, 1);
-nCstrDof
 q        = zeros(nDof, TimeSet.numel);
 qd       = zeros(nDof, TimeSet.numel);
 qdd      = zeros(nDof, TimeSet.numel);
