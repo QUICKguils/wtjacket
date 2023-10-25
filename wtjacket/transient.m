@@ -1,5 +1,8 @@
-function transient(C, BS, SS, KM, SOL, opts)
+function [MS, DM, AM] = transient(C, BS, SS, KM, SOL, opts)
 % TRANSIENT  Transient response due to a harmonic excitation.
+
+% TODO:
+% - cleaner to embed TimeSet in the loadSet, DM and AM vars.
 
 % 1. Set the time discretization
 
@@ -21,19 +24,19 @@ loadSet = ThisLoad.create_load_set(SOL.nDof, TimeSet.sample);
 
 % TODO: this should be passed as transient() argument.
 k = SOL.nMode;
-ModSup = modal_superposition(k, SOL, KM, Damping.eps, loadSet, TimeSet, C.INITIAL_CONDITIONS);
+MS = modal_superposition(k, SOL, KM, Damping.eps, loadSet, TimeSet, C.INITIAL_CONDITIONS);
 
 % 4. Compute the displacements
 
-DisplSetDm = mode_displacement(ModSup.nu, SOL.mode);
-DisplSetAm = mode_acceleration(KM, loadSet,  SOL, ModSup);
+DM = mode_displacement(MS.nu, SOL.mode);
+AM = mode_acceleration(KM, loadSet,  SOL, MS);
 
 % 5. Plot the displacements
 
 if contains(opts, 'p')
 	lookupNodeLabels = [18, 22];
-	plot_displacement(DisplSetDm, TimeSet, lookupNodeLabels, ThisLoad.direction, SS.nodeList, k);
-	plot_displacement(DisplSetAm, TimeSet, lookupNodeLabels, ThisLoad.direction, SS.nodeList, k);
+	plot_displacement(DM, TimeSet, lookupNodeLabels, ThisLoad.direction, SS.nodeList, k);
+	plot_displacement(AM, TimeSet, lookupNodeLabels, ThisLoad.direction, SS.nodeList, k);
 end
 
 end

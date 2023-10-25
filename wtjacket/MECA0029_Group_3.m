@@ -51,7 +51,7 @@ C = load_constants();
 [BS, SS, KM, SOL] = modeling(C, sdiv, nMode, opts);
 
 % 2. Transient response.
-% transient(C, KM, SOL, opts);
+[MS, DM, AM] = transient(C, BS, SS, KM, SOL, opts);
 
 % 3. Reduction methods.
 reduction(opts);
@@ -64,6 +64,9 @@ if contains(opts, 's')
 	save(fullfile(resDirectory, "subdivisedStructure.mat"), "-struct", "SS");
 	save(fullfile(resDirectory, "globalMatrices.mat"),      "-struct", "KM");
 	save(fullfile(resDirectory, "modelingSolution.mat"),    "-struct", "SOL");
+	save(fullfile(resDirectory, "modalSuperposition.mat"),  "-struct", "MS");
+	save(fullfile(resDirectory, "modeDisplacement.mat"),    "-struct", "DM");
+	save(fullfile(resDirectory, "modeAcceleration.mat"),    "-struct", "AM");
 end
 
 end

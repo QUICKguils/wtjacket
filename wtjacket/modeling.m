@@ -38,7 +38,7 @@ function [BS, SS, KM, SOL] = modeling(C, sdiv, nMode, opts)
 %	  nDof           (int)                 -- Number of DOFs.
 %	  massFromRbm    (double)              -- Mass calculated from RBM [kg].
 
-% Reset class internal states, close previous plots.
+% Reset class internal states.
 clear Node Elem;
 
 % 1. Subdivised structure
