@@ -14,9 +14,9 @@ function [ModalSup, DisplMeth, AccelMeth] = transient(Cst, SdivStruct, FemMat, F
 %	ModalSup (struct) -- Modal superposition parameters, with fields:
 %	  phi (nMode x nTime) -- 
 %	  nu  (nMode x nTime) -- 
-%	DisplMeth, AccelMeth (struct)
-%	  Solution of the mode displacement and mode acceleration method,
-%	  with fields:
+%	DisplMeth, AccelMeth, NewmkMeth (struct)
+%	  Solution of the mode displacement method, mode acceleration method
+%	  and Newmark's time integration method, with fields:
 %	    q      (nDof x nTime) -- Time evolution of the displacements.
 %	    method (1 x N char)   -- Name of the method.
 
@@ -48,13 +48,15 @@ ModalSup = modal_superposition(nMode, FemSol, FemMat, Damping.eps, loadSet, Time
 
 DisplMeth = mode_displacement(ModalSup.nu, FemSol.mode, nMode);
 AccelMeth = mode_acceleration(FemMat, loadSet,  FemSol, ModalSup, nMode);
+NewmkMeth = newmark(FemMat.M_free, Damping.C, FemMat.K_free, Cst.INITIAL_CONDITIONS, TimeSet, loadSet);
 
 % 5. Plot the displacements
 
 if contains(opts, 'p')
-	lookupNodeLabels = [18, 22];
+	lookupNodeLabels = [18];
 	plot_displacement(DisplMeth, TimeSet, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
 	plot_displacement(AccelMeth, TimeSet, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
+	plot_displacement(NewmkMeth, TimeSet, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
 end
 
 end
@@ -77,7 +79,7 @@ end
 
 %% Set the proportional damping parameters
 
-function Damping = set_damping_parameters(eps1, eps2, w0, KM)
+function Damping = set_damping_parameters(eps1, eps2, w0, FemMat)
 % SET_DAMPING_MATRIX  Set the damping matrix, assuming a proportional damping.
 %
 % Arguments:
@@ -85,7 +87,7 @@ function Damping = set_damping_parameters(eps1, eps2, w0, KM)
 %	  Damping ratio of the first two modes.
 %	w0 (1 x nMode double)
 %	  Natural frequencies of the asociated conservative system [rad/s].
-%	KM (struct)
+%	FemMat (struct)
 %	  Global structural matrices.
 % Return:
 %	Damping (struct)
@@ -99,7 +101,7 @@ a = 2             * (w0(1)*eps1 - w0(2)*eps2) / (w0(1)^2 - w0(2)^2);
 b = 2*w0(1)*w0(2) * (w0(1)*eps2 - w0(2)*eps1) / (w0(1)^2 - w0(2)^2);
 
 Damping.eps = 0.5 * (a*w0 + b./w0);
-Damping.C   = a*KM.K + b*KM.M;
+Damping.C   = a*FemMat.K_free + b*FemMat.M_free;
 end
 
 %% Compute the modal superposition
