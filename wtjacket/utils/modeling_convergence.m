@@ -2,8 +2,8 @@ function modeling_convergence(varargin)
 % MODELING_CONVERGENCE  Analyze the convergence of the simulation carried out.
 %
 % Arguments:
-%	sdivSet (1xN int) -- Set of desired number of subdivisions (default: 1:8).
-%	nMode   (int)     -- Number of first mode computed (default: 8).
+%	sdivSet (1 x N int) -- Set of desired number of subdivisions (default: 1:8).
+%	nMode   (int)       -- Number of first mode computed (default: 8).
 
 % Set default value for optional inputs.
 optargs = {1:8, 8};
@@ -18,8 +18,8 @@ NxSolution = load_nx_solution(sdivSet, nMode);
 plot_frequency_convergence(MatlabSolution);
 plot_frequency_convergence(NxSolution);
 
-%plot_mass_convergence(MLSol);
-%plot_mass_convergence(NXSol);
+% plot_mass_convergence(MLSol);
+% plot_mass_convergence(NXSol);
 
 % plot_mode_convergence(MLSol);
 % plot_mode_convergence(NXSol);
@@ -29,14 +29,14 @@ function Solution = compute_matlab_solution(sdivSet, nMode)
 % COMPUTE_MATLAB_SOLUTION  Compute the Matlab solutions.
 %
 % Arguments:
-%	sdivSet (1xN int) -- Set of desired number of subdivisions.
-%	nMode   (int)     -- Number of first mode computed.
+%	sdivSet (1 x N int) -- Set of desired number of subdivisions.
+%	nMode   (int)       -- Number of first mode computed.
 % Return:
 %	Solution (struct) -- Set of solution, with fields:
-%	  nMode   (int)        -- Number of first mode computed.
-%	  sdivSet (1xN int)    -- Set of number of subdivisions.
-%	  freqSet (1xN double) -- Set of associated frequencies.
-%	  name    (char)       -- Name of the solution.
+%	  nMode   (int)          -- Number of first mode computed.
+%	  sdivSet (1 x N int)    -- Set of number of subdivisions.
+%	  freqSet (1 x N double) -- Set of associated frequencies.
+%	  name    (char)         -- Name of the solution.
 
 % Gather the frequencies, modes and masses for the desired subdivisions.
 freqSet = zeros(numel(sdivSet), nMode);
@@ -44,12 +44,12 @@ freqSet = zeros(numel(sdivSet), nMode);
 % massSet = zeros(numel(sdivSet), 2);
 
 % Constant project quantities.
-C = load_constants();
+Cst = load_constants();
 
 for i = 1:numel(sdivSet)
-	[~, ~, ~, SOL] = modeling(C, sdivSet(i), nMode, '');
+	[~, ~, ~, FemSol] = modeling(Cst, sdivSet(i), nMode, '');
 
-	freqSet(i, :) = SOL.frequencies;
+	freqSet(i, :) = FemSol.frequencyHertz;
 
 	% 	for d = 1:BS.nbDOF
 	% 		modeSet(i, d, :) = SOL.modes(d,:);

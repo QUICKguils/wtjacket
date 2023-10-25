@@ -45,13 +45,13 @@ addpath(genpath(fullfile(rootDirectory, "wtjacket")));
 %% Execute the code
 
 % 0. Load the constants.
-C = load_constants();
+Cst = load_constants();
 
 % 1. Modeling of the structure.
-[BS, SS, KM, SOL] = modeling(C, sdiv, nMode, opts);
+[BareStruct, SdivStruct, FemMat, FemSol] = modeling(Cst, sdiv, nMode, opts);
 
 % 2. Transient response.
-[MS, DM, AM] = transient(C, BS, SS, KM, SOL, opts);
+[ModalSup, DisplMeth, AccelMeth] = transient(Cst, SdivStruct, FemMat, FemSol, nMode, opts);
 
 % 3. Reduction methods.
 reduction(opts);
@@ -59,14 +59,14 @@ reduction(opts);
 %% Save generated data
 
 if contains(opts, 's')
-	save(fullfile(resDirectory, "constants.mat"),           "-struct", "C");
-	save(fullfile(resDirectory, "bareStructure.mat"),       "-struct", "BS");
-	save(fullfile(resDirectory, "subdivisedStructure.mat"), "-struct", "SS");
-	save(fullfile(resDirectory, "globalMatrices.mat"),      "-struct", "KM");
-	save(fullfile(resDirectory, "modelingSolution.mat"),    "-struct", "SOL");
-	save(fullfile(resDirectory, "modalSuperposition.mat"),  "-struct", "MS");
-	save(fullfile(resDirectory, "modeDisplacement.mat"),    "-struct", "DM");
-	save(fullfile(resDirectory, "modeAcceleration.mat"),    "-struct", "AM");
+	save(fullfile(resDirectory, "constants.mat"),           "-struct", "Cst");
+	save(fullfile(resDirectory, "bareStructure.mat"),       "-struct", "BareStruct");
+	save(fullfile(resDirectory, "subdivisedStructure.mat"), "-struct", "SdivStruct");
+	save(fullfile(resDirectory, "FemMatrices.mat"),         "-struct", "FemMat");
+	save(fullfile(resDirectory, "FemSolution.mat"),         "-struct", "FemSol");
+	save(fullfile(resDirectory, "modalSuperposition.mat"),  "-struct", "ModalSup");
+	save(fullfile(resDirectory, "displacementMethod.mat"),  "-struct", "DisplMeth");
+	save(fullfile(resDirectory, "accelerationMethod.mat"),  "-struct", "AccelMeth");
 end
 
 end

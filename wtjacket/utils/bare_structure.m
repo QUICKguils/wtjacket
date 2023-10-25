@@ -1,13 +1,13 @@
-function BS = bare_structure(C, opts)
+function BareStruct = bare_structure(Cst, opts)
 % BARE_STRUCTURE  Definition of the wind turbine jacket structure.
 %
 % Argument:
-%	C    (struct)   -- Constant project quantities.
+%	Cst  (struct)   -- Constant project quantities.
 %	opts (1xN char) -- Options.
 %	  ''  -> No options.
 %	  'p' -> Enable plots creation.
 % Return:
-%	BS (struct) -- Bare structure, with fields:
+%	BareStruct (struct) -- Bare structure, with fields:
 %	  nodeList {1xN Node}             -- Cell list of nodes.
 %	  elemList {1xN Elem}             -- Cell list of elements.
 %	  loadList {1xN Load}             -- Cell list of loads.
@@ -33,24 +33,24 @@ function BS = bare_structure(C, opts)
 			cstrList = repmat("free", 1, 4);
 		end
 
-		shift = tand(C.LEG_ANGLE) * h;
+		shift = tand(Cst.LEG_ANGLE) * h;
 		frame = {
-			Node([             shift,              shift,  h], cstrList(1));
-			Node([C.BASE_WIDTH-shift,              shift,  h], cstrList(2));
-			Node([C.BASE_WIDTH-shift, C.BASE_WIDTH-shift,  h], cstrList(3));
-			Node([             shift, C.BASE_WIDTH-shift,  h], cstrList(4))};
+			Node([               shift,                shift,  h], cstrList(1));
+			Node([Cst.BASE_WIDTH-shift,                shift,  h], cstrList(2));
+			Node([Cst.BASE_WIDTH-shift, Cst.BASE_WIDTH-shift,  h], cstrList(3));
+			Node([               shift, Cst.BASE_WIDTH-shift,  h], cstrList(4))};
 	end
 
 nodeList = [
 	% The four horizontal frames.
-	elevate(C.FRAME_HEIGHT(1), repmat("clamped", 1, 4));  % The base is clamped.
-	elevate(C.FRAME_HEIGHT(2));
-	elevate(C.FRAME_HEIGHT(3));
-	elevate(C.FRAME_HEIGHT(4));
-	elevate(C.FRAME_HEIGHT(5));
+	elevate(Cst.FRAME_HEIGHT(1), repmat("clamped", 1, 4));  % The base is clamped.
+	elevate(Cst.FRAME_HEIGHT(2));
+	elevate(Cst.FRAME_HEIGHT(3));
+	elevate(Cst.FRAME_HEIGHT(4));
+	elevate(Cst.FRAME_HEIGHT(5));
 	% The two nodes to attach the nacelle.
-	{Node([C.BASE_WIDTH/2, C.BASE_WIDTH/2, C.FRAME_HEIGHT(end)])};
-	{Node([C.BASE_WIDTH/2, C.BASE_WIDTH/2, C.NACELLE_HEIGHT   ])}]';
+	{Node([Cst.BASE_WIDTH/2, Cst.BASE_WIDTH/2, Cst.FRAME_HEIGHT(end)])};
+	{Node([Cst.BASE_WIDTH/2, Cst.BASE_WIDTH/2, Cst.NACELLE_HEIGHT   ])}]';
 
 %% Elements
 
@@ -126,10 +126,10 @@ cmList = {ConcentratedMass(nodeList{22})};
 %% Loads
 % Only the assigned load, for the transient part.
 
-loadAmplitude    = C.TAIL_MASS*C.TAIL_SPEED*C.MOMENTUM_TRANSFER / C.IMPACT_DURATION;
-loadDirection    = [cosd(C.FORCE_DIRECTION), -sind(C.FORCE_DIRECTION), 0];
+loadAmplitude = Cst.TAIL_MASS * Cst.TAIL_SPEED * Cst.MOMENTUM_TRANSFER / Cst.IMPACT_DURATION;
+loadDirection = [cosd(Cst.FORCE_DIRECTION), -sind(Cst.FORCE_DIRECTION), 0];
 
-loadList = {Load(nodeList{18}, loadDirection, loadAmplitude, C.LOAD_FREQUENCY_HERTZ)};
+loadList = {Load(nodeList{18}, loadDirection, loadAmplitude, Cst.LOAD_FREQUENCY_HERTZ)};
 
 %% Total mass
 
@@ -152,14 +152,14 @@ end
 
 %% Build return data structure.
 
-BS.nodeList = nodeList;
-BS.elemList = elemList;
-BS.cmList   = cmList;
-BS.loadList = loadList;
-BS.nNode    = numel(nodeList);
-BS.nElem    = numel(elemList);
-BS.nDof     = BS.nNode * Node.nDof;
-BS.mass     = mass;
+BareStruct.nodeList = nodeList;
+BareStruct.elemList = elemList;
+BareStruct.cmList   = cmList;
+BareStruct.loadList = loadList;
+BareStruct.nNode    = numel(nodeList);
+BareStruct.nElem    = numel(elemList);
+BareStruct.nDof     = BareStruct.nNode * Node.nDof;
+BareStruct.mass     = mass;
 
 end
 
