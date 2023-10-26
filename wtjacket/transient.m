@@ -1,168 +1,190 @@
-function [ModalSup, DisplMeth, AccelMeth] = transient(Cst, SdivStruct, FemMat, FemSol, nMode, opts)
+function [AlgSys, ModalSup, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts)
 % TRANSIENT  Transient response due to a harmonic excitation.
 %
 % Arguments:
 %	Cst        (struct)   -- Constant project quantities.
 %	SdivStruct (struct)   -- Subdivised structure.
-%	FemMat     (struct)   -- Global structural matrices.
+%	AlgSys     (struct)   -- Parameters of the discrete algebraic system.
 %	FemSol     (struct)   -- Solution of the FEM simulation.
-%	nMode      (int)      -- Number of modes involved in the modal superposition.
+%	nMode      (int)      -- Number of modes used in the modal superposition.
 %	opts       (1xN char) -- Options.
 %	  ''  -> No options.
 %	  'p' -> Enable plots creation.
 % Returns:
+%	AlgSys   (struct) -- Parameters of the discrete algebraic system, with fields:
+%	  K_free   (nDofxnDof double) -- Global siffness matrix, without constraints.
+%	  M_free   (nDofxnDof double) -- Global mass matrix, without constraints.
+%	  K        (NxN double)       -- Global siffness matrix, with constraints.
+%	  M        (NxN double)       -- Global mass matrix, with constraints.
+%	  C        (NxN double)       -- Proportional damping matrix, with constraints.
+%	  eps      (1xNmode double)   -- Proportional damping ratios.
+%	  cstrMask (1xnDof bool)      -- Index on constrained DOFs.
 %	ModalSup (struct) -- Modal superposition parameters, with fields:
-%	  phi (nMode x nTime) -- 
-%	  nu  (nMode x nTime) -- 
-%	DisplMeth, AccelMeth, NewmkMeth (struct)
-%	  Solution of the mode displacement method, mode acceleration method
-%	  and Newmark's time integration method, with fields:
-%	    q      (nDof x nTime) -- Time evolution of the displacements.
-%	    method (1 x N char)   -- Name of the method.
+%	  phi   (nModexnTime double) -- Modal participation factors.
+%	  nu    (nModexnTime double) -- Modal time functions.
+%	  nMode (int)                -- Number of modes used.
+%	TransientSol (struct) -- Solution of the transient problem, with fields:
+%	  ModeDisplacementSol (struct) -- By using the mode displacement method.
+%	  ModeAccelerationSol (struct) -- By using the mode acceleration method.
+%	  NewmarkSol          (struct) -- By using the Newmark's time integration.
 
 % TODO:
-% - cleaner to embed TimeSet in the loadSet, DisplMeth and AccelMeth.
+% There's redundant and/or unused data in returned structure.
 
-% 1. Set the time discretization
+% 1. Temporal parameters
+% TODO: see if better to pass that in argument of transient().
 
 timeSample = 0:0.001:10;
-TimeSet = set_discrete_time(timeSample);
+TimeParams = set_time_parameters(timeSample, Cst.INITIAL_CONDITIONS);
 
-% 2. Set the proportional damping parameters
+% 2. Proportional damping parameters
 
-Damping = set_damping_parameters(Cst.DAMPING_RATIO, Cst.DAMPING_RATIO, FemSol.frequencyRad, FemMat);
+eps = [Cst.DAMPING_RATIO, Cst.DAMPING_RATIO];
+[AlgSys.C, AlgSys.eps] = set_damping_parameters(eps, FemSol.frequencyRad, AlgSys);
 
-% 3. Compute the modal superposition
+% 3. Time-discretized load
 
 % Choose the load to study.
 % NOTE: for the sake of completeness.
 % By the way, only one load was assigned in this project.
-ThisLoad = SdivStruct.loadList{1};
+lookupLoadLabel = 1;
+ThisLoad = SdivStruct.loadList{lookupLoadLabel};
+
 % Create the time-discretized load.
-loadSet = ThisLoad.create_load_set(FemSol.nDof, TimeSet.sample);
+DiscreteLoad = ThisLoad.set_discrete_load(FemSol.nDof, TimeParams.sample);
 
-% TODO: this should be passed as transient() argument.
-ModalSup = modal_superposition(nMode, FemSol, FemMat, Damping.eps, loadSet, TimeSet, Cst.INITIAL_CONDITIONS);
+% 4. Compute the modal superposition
 
-% 4. Compute the displacements
+ModalSup = modal_superposition(AlgSys, FemSol, TimeParams, DiscreteLoad.sample, nMode);
 
-DisplMeth = mode_displacement(ModalSup.nu, FemSol.mode, nMode);
-AccelMeth = mode_acceleration(FemMat, loadSet,  FemSol, ModalSup, nMode);
-NewmkMeth = newmark(FemMat.M_free, Damping.C, FemMat.K_free, Cst.INITIAL_CONDITIONS, TimeSet, loadSet);
+% 5. Compute the displacements
 
-% 5. Plot the displacements
+ModeDisplSol = mode_displacement(FemSol, ModalSup);
+ModeAccelSol = mode_acceleration(AlgSys, FemSol, ModalSup);
+% NewmarkSol   = newmark(AlgSys.M, Damping.C, AlgSys.K, TimeParams, DiscreteLoad.sample);
+
+% 6. Plot the displacements
 
 if contains(opts, 'p')
-	lookupNodeLabels = [18];
-	plot_displacement(DisplMeth, TimeSet, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
-	plot_displacement(AccelMeth, TimeSet, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
-	plot_displacement(NewmkMeth, TimeSet, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
+	lookupNodeLabels = [18, 22];
+	plot_displacement(ModeDisplSol, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
+	plot_displacement(ModeAccelSol, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
+% 	plot_displacement(NewmarkSol,   lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
 end
 
+TransientSol.ModeDisplacement = ModeDisplSol;
+TransientSol.ModeAcceleration = ModeAccelSol;
+% TransientSol.Newmark          = NewmarkSol;
+
 end
 
-%% Set the time discretization
+%% 1. Set the time discretization
 
-function TimeSet = set_discrete_time(timeSample)
-% SET_DISCRETE_TIME  Set the time discretization.
+function TimeParams = set_time_parameters(timeSample, initialConditions)
+% SET_TIME_PARAMETERS  Set the temporal parameters of the problem.
 
 % Ensure the time vector is in the expected shape.
 timeSample = reshape(timeSample, 1, []);
 
 % TODO: see if start and end fields are used.
-TimeSet.sample = timeSample;
-TimeSet.steps  = [diff(timeSample), timeSample(end)-timeSample(end-1)];
-TimeSet.start  = timeSample(1);
-TimeSet.end    = timeSample(end);
-TimeSet.numel  = numel(timeSample);
+TimeParams.sample = timeSample;
+TimeParams.steps  = [diff(timeSample), timeSample(end)-timeSample(end-1)];
+TimeParams.start  = timeSample(1);
+TimeParams.end    = timeSample(end);
+TimeParams.numel  = numel(timeSample);
+TimeParams.ic     = initialConditions;
 end
 
-%% Set the proportional damping parameters
+%% 2. Set the proportional damping parameters
 
-function Damping = set_damping_parameters(eps1, eps2, w0, FemMat)
+function [C, eps] = set_damping_parameters(eps, w0, AlgSys)
 % SET_DAMPING_MATRIX  Set the damping matrix, assuming a proportional damping.
 %
 % Arguments:
-%	eps1, eps2 (double)
-%	  Damping ratio of the first two modes.
-%	w0 (1 x nMode double)
+%	eps (1x2 double)
+%	  Proportional damping ratios of the first two modes.
+%	w0 (1xnMode double)
 %	  Natural frequencies of the asociated conservative system [rad/s].
-%	FemMat (struct)
-%	  Global structural matrices.
-% Return:
-%	Damping (struct)
-%	  Damping parameters of the proportional damping model, with fields:
-%	    eps (1 x Nmode double) -- Damping ratios of the first modes.
-%	    C   (N x N double)     -- Damping matrix.
+%	AlgSys (struct)
+%	  Parameters of the discrete algebraic system.
+% Returns:
+%	C   (NxN double)     -- Proportional damping matrix.
+%	eps (1xNmode double) -- Proportional damping ratios of the first modes.
 %
 % See reference book, p.156.
 
-a = 2             * (w0(1)*eps1 - w0(2)*eps2) / (w0(1)^2 - w0(2)^2);
-b = 2*w0(1)*w0(2) * (w0(1)*eps2 - w0(2)*eps1) / (w0(1)^2 - w0(2)^2);
+a = 2             * (w0(1)*eps(1) - w0(2)*eps(2)) / (w0(1)^2 - w0(2)^2);
+b = 2*w0(1)*w0(2) * (w0(1)*eps(2) - w0(2)*eps(1)) / (w0(1)^2 - w0(2)^2);
 
-Damping.eps = 0.5 * (a*w0 + b./w0);
-Damping.C   = a*FemMat.K_free + b*FemMat.M_free;
+C   = a*AlgSys.K + b*AlgSys.M;
+eps = 0.5 * (a*w0 + b./w0);
 end
 
-%% Compute the modal superposition
+%% 4. Compute the modal superposition
 
-function ModalSup = modal_superposition(nMode, SOL, KM, eps, loadSet, TimeSet, initialConditions)
+function ModalSup = modal_superposition(AlgSys, FemSol, TimeParams, loadSample, nMode)
 % MODAL_SUPERPOSITION  Compute the modal superposition, from the first vibration modes.
 
-if nMode > SOL.nMode
-	warning("Only the first " + num2str(SOL.nMode) + " modes have been computed.");
-	nMode = SOL.nMode;
+if nMode > FemSol.nMode
+	warning("Only the first " + num2str(FemSol.nMode) + " modes have been computed.");
+	nMode = FemSol.nMode;
 end
 
-A = initialConditions(1);
-B = initialConditions(2);
+phi = zeros(nMode, TimeParams.numel);
+eta = zeros(nMode, TimeParams.numel);
 
-phi = zeros(nMode, TimeSet.numel);
-nu  = zeros(nMode, TimeSet.numel);
+% Aliases.
+A   = TimeParams.ic(1);
+B   = TimeParams.ic(2);
+t   = TimeParams.sample;
+eps = AlgSys.eps;
 
 for r = 1:nMode
-	mu           = SOL.mode(:, r)' * KM.M_free * SOL.mode(:, r);
-	phi(r, :)    = SOL.mode(:, r)' * loadSet / mu;
-	wd           = sqrt(1-eps(r)^2) * SOL.frequencyRad(r);
-	h            = 1/wd .* exp(-eps(r)*wd*TimeSet.sample) .* sin(wd*TimeSet.sample);
-	nuTransient  = exp(-eps(r)*wd*TimeSet.sample) .* (A*cos(wd*TimeSet.sample) + B*sin(wd*TimeSet.sample));
+	mu           = FemSol.mode(:, r)' * AlgSys.M_free * FemSol.mode(:, r);
+	phi(r, :)    = FemSol.mode(:, r)' * loadSample / mu;
+	wd           = sqrt(1-eps(r)^2) * FemSol.frequencyRad(r);
+	h            = 1/wd .* exp(-eps(r)*wd*t) .* sin(wd*t);
+	nuTransient  = exp(-eps(r)*wd*t) .* (A*cos(wd*t) + B*sin(wd*t));
 	discreteConv = conv(phi(r, :), h);
-	nuPermanent  = discreteConv(1:length(TimeSet.sample)) .* TimeSet.steps;
-	nu(r, :)     = nuTransient + nuPermanent;
+	nuPermanent  = discreteConv(1:TimeParams.numel) .* TimeParams.steps;
+	eta(r, :)    = nuTransient + nuPermanent;
 end
 
-ModalSup.phi   = phi;
-ModalSup.nu    = nu;
-ModalSup.nMode = nMode;
+ModalSup.timeSample = t;
+ModalSup.loadSample = loadSample;
+ModalSup.phi        = phi;
+ModalSup.eta        = eta;
+ModalSup.nMode      = nMode;
 end
 
-%% Compute the displacements
+%% 5. Compute the displacements
 
-function DisplMeth = mode_displacement(nu, mode, nMode)
+function ModeDisplSol = mode_displacement(FemSol, ModalSup)
 % MODE_DISPLACEMENT  Compute the displacements with the mode displacement method.
 
-DisplMeth.q = mode(:, 1:nMode) * nu;
-DisplMeth.method = 'mode displacement';
+ModeDisplSol.q = FemSol.mode(:, 1:ModalSup.nMode) * ModalSup.eta;
+ModeDisplSol.timeSample = ModalSup.timeSample;
+ModeDisplSol.name = 'mode displacement';
 end
 
-% TODO: this is a non-working draft
-function AccelMeth = mode_acceleration(FemMat, loadSet, FemSol, ModalSup, nMode)
+function ModeAccelSol = mode_acceleration(AlgSys, FemSol, ModalSup)
 % MODE_ACCELERATION  Compute the displacements with the mode acceleration method.
 
-loadSetCstr = loadSet(~FemMat.cstrMask, :);
-completeStaticResponseCstr = FemMat.K \ loadSetCstr;
-completeStaticResponse = zeros(size(loadSet));
-completeStaticResponse(~FemMat.cstrMask, :) = completeStaticResponseCstr;
+loadSampleCstr = ModalSup.loadSample(~AlgSys.cstrMask, :);
+completeStaticResponseCstr = AlgSys.K \ loadSampleCstr;
+completeStaticResponse = zeros(size(ModalSup.loadSample));
+completeStaticResponse(~AlgSys.cstrMask, :) = completeStaticResponseCstr;
 
-partialStaticResponse  = FemSol.mode(:, 1:nMode) * (ModalSup.phi ./ FemSol.frequencyRad(1:nMode).^2);
+partialStaticResponse  = FemSol.mode(:, 1:ModalSup.nMode) * (ModalSup.phi ./ FemSol.frequencyRad(1:ModalSup.nMode).^2);
 
-AccelMeth.q = FemSol.mode(:, 1:nMode) * ModalSup.nu + completeStaticResponse -partialStaticResponse;
-AccelMeth.method = 'mode acceleration';
+ModeAccelSol.q = FemSol.mode(:, 1:ModalSup.nMode) * ModalSup.eta + completeStaticResponse -partialStaticResponse;
+ModeAccelSol.timeSample = ModalSup.timeSample;
+ModeAccelSol.name = 'mode acceleration';
 end
 
-%% Plot the displacements
+%% 6. Plot the displacements
 
-function plot_displacement(DisplSet, TimeSet, nodeLabels, dir, nodeList, nMode)
+function plot_displacement(TransientSol, nodeLabels, dir, nodeList, nMode)
 % PLOT_DISPLACEMENT  Plot the time evolution of the displacements.
 
 allclose(norm(dir), 1);
@@ -171,19 +193,19 @@ figure("WindowStyle", "docked");
 
 nNode = numel(nodeLabels);
 for i = 1:nNode
-	qX = DisplSet.q(nodeList{nodeLabels(i)}.dof(1), :) * dir(1);
-	qY = DisplSet.q(nodeList{nodeLabels(i)}.dof(2), :) * dir(2);
-	qZ = DisplSet.q(nodeList{nodeLabels(i)}.dof(3), :) * dir(3);
+	qX = TransientSol.q(nodeList{nodeLabels(i)}.dof(1), :) * dir(1);
+	qY = TransientSol.q(nodeList{nodeLabels(i)}.dof(2), :) * dir(2);
+	qZ = TransientSol.q(nodeList{nodeLabels(i)}.dof(3), :) * dir(3);
 
 	qDir = qX + qY + qZ;
 
 	subplot(nNode, 1, i);
-	plot(TimeSet.sample, qDir);
+	plot(TransientSol.timeSample, qDir);
 	xlabel("Time (s)");
 	ylabel("Displacement (dir: [" + num2str(dir, '%.3f  ') + "])");
 	title('Transient response', ...
 		['(node: ', num2str(nodeLabels(i)), ...
-		', method: ', DisplSet.method, ...
+		', method: ', TransientSol.name, ...
 		', order: ', num2str(nMode), ')']);
 	grid;
 end

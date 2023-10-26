@@ -48,10 +48,10 @@ addpath(genpath(fullfile(rootDirectory, "wtjacket")));
 Cst = load_constants();
 
 % 1. Modeling of the structure.
-[BareStruct, SdivStruct, FemMat, FemSol] = modeling(Cst, sdiv, nMode, opts);
+[BareStruct, SdivStruct, AlgSys, FemSol] = modeling(Cst, sdiv, nMode, opts);
 
 % 2. Transient response.
-[ModalSup, DisplMeth, AccelMeth] = transient(Cst, SdivStruct, FemMat, FemSol, nMode, opts);
+[AlgSys, ModalSup, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts);
 
 % 3. Reduction methods.
 reduction(opts);
@@ -62,11 +62,10 @@ if contains(opts, 's')
 	save(fullfile(resDirectory, "constants.mat"),           "-struct", "Cst");
 	save(fullfile(resDirectory, "bareStructure.mat"),       "-struct", "BareStruct");
 	save(fullfile(resDirectory, "subdivisedStructure.mat"), "-struct", "SdivStruct");
-	save(fullfile(resDirectory, "FemMatrices.mat"),         "-struct", "FemMat");
+	save(fullfile(resDirectory, "algebraicSystem.mat"),     "-struct", "AlgSys");
 	save(fullfile(resDirectory, "FemSolution.mat"),         "-struct", "FemSol");
 	save(fullfile(resDirectory, "modalSuperposition.mat"),  "-struct", "ModalSup");
-	save(fullfile(resDirectory, "displacementMethod.mat"),  "-struct", "DisplMeth");
-	save(fullfile(resDirectory, "accelerationMethod.mat"),  "-struct", "AccelMeth");
+	save(fullfile(resDirectory, "transientSolution.mat"),   "-struct", "TransientSol");
 end
 
 end

@@ -1,41 +1,48 @@
 classdef Load
-	% LOAD  Represent a harmonic structural load.
+	% LOAD  Represent a structural load.
 
 	properties (SetAccess = protected)
-		node           Node                         % Node at which the load is applied.
-		direction      (1,  3) double {mustBeReal}  % Direction (structural axes).
-		amplitude      (1,  1) double {mustBeReal}  % Amplitude [N].
-		frequencyHertz (1,  1) double {mustBeReal}  % Frequency [Hz].
-		frequencyRad   (1,  1) double {mustBeReal}  % Frequency [rad/s].
+		node          Node                        % Node at which the load is applied.
+		direction     (1, 3) double {mustBeReal}  % Direction (structural axes) [m].
+		timeEvolution function_handle             % Time evolution law [s -> N].
 	end
 
 	methods
-		function load = Load(node, direction, amplitude, frequencyHertz)
+		function load = Load(node, direction, timeEvolution)
 			if nargin > 0
-				load.node           = node;
-				load.direction      = direction;
-				load.amplitude      = amplitude;
-				load.frequencyHertz = frequencyHertz;
-				load.frequencyRad   = frequencyHertz * 2*pi;
+				load.node          = node;
+				load.direction     = direction;
+				load.timeEvolution = timeEvolution;
+
 			end
 		end
 
-		function loadSet = create_load_set(load, nDof, timeSample)
-		% CREATE_LOAD_SET  Create a set of time-discretized loads.
-		%
-		% Arguments:
-		%	nDof       (double)       -- Number of structural DOFs.
-		%	timeSample (1 x N double) -- Time sample [s].
+		function DiscreteLoad = set_discrete_load(load, nDof, timeSample)
+			% SET_DISCRETE_LOAD  Create a sample of time-discretized load.
+			%
+			% Arguments:
+			%	nDof       (double)     -- Number of structural DOFs.
+			%	timeSample (1xnTime double) -- Time sample [s].
+			% Return:
+			%	DiscreteLoad (struct) -- time-discretized load, with fields:
+			%	  node          (Node)              -- Node at which the load is applied.
+			%	  direction     (1x3 double)        -- Direction (structural axes) [m].
+			%	  timeEvolution (f_handle)          -- Time evolution law [s -> N].
+			%	  sample        (nDofxnTime double) -- Load sample [N].
 
-			harmonicLoad = @(t) load.amplitude*sin(load.frequencyRad*t);
-			harmonicLoadX= @(t)  harmonicLoad(t) * load.direction(1);
-			harmonicLoadY= @(t)  harmonicLoad(t) * load.direction(2);
-			harmonicLoadZ= @(t)  harmonicLoad(t) * load.direction(3);
+			% Keep the properties of the Load object.
+			DiscreteLoad.node          = load.node;
+			DiscreteLoad.direction     = load.direction;
+			DiscreteLoad.timeEvolution = load.timeEvolution;
 
-			loadSet = zeros(nDof, numel(timeSample));
-			loadSet(load.node.dof(1), :) = harmonicLoadX(timeSample);
-			loadSet(load.node.dof(2), :) = harmonicLoadY(timeSample);
-			loadSet(load.node.dof(3), :) = harmonicLoadZ(timeSample);
+			load_X = @(t) load.timeEvolution(t) * load.direction(1);
+			load_Y = @(t) load.timeEvolution(t) * load.direction(2);
+			load_Z = @(t) load.timeEvolution(t) * load.direction(3);
+
+			DiscreteLoad.sample = zeros(nDof, numel(timeSample));
+			DiscreteLoad.sample(load.node.dof(1), :) = load_X(timeSample);
+			DiscreteLoad.sample(load.node.dof(2), :) = load_Y(timeSample);
+			DiscreteLoad.sample(load.node.dof(3), :) = load_Z(timeSample);
 		end
 	end
 end

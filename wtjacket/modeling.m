@@ -1,4 +1,4 @@
-function [BareStruct, SdivStruct, FemMat, FemSol] = modeling(Cst, sdiv, nMode, opts)
+function [BareStruct, SdivStruct, AlgSys, FemSol] = modeling(Cst, sdiv, nMode, opts)
 % MODELING  Model of the wt jacket, using 3D beam elements.
 %
 % Arguments:
@@ -8,37 +8,37 @@ function [BareStruct, SdivStruct, FemMat, FemSol] = modeling(Cst, sdiv, nMode, o
 %	opts  (1xN char) -- Options.
 %	  ''  -> No options.
 %	  'p' -> Enable plots creation.
-% Return:
+% Returns:
 %	BareStruct (struct) -- Bare structure, with fields:
-%	  nodeList {1 x N Node}             -- Cell list of nodes.
-%	  elemList {1 x N Elem}             -- Cell list of elements.
-%	  cmList   {1 x N ConcentratedMass} -- Cell list of concentrated masses.
-%	  loadList {1 x N Load}             -- Cell list of loads.
-%	  nNode    (int)                    -- Number of nodes.
-%	  nElem    (int)                    -- Number of elements.
-%	  nDof     (int)                    -- Number of DOFs.
-%	  mass     (int)                    -- Total mass of the structure [kg].
+%	  nodeList {1xN Node}             -- Cell list of nodes.
+%	  elemList {1xN Elem}             -- Cell list of elements.
+%	  cmList   {1xN ConcentratedMass} -- Cell list of concentrated masses.
+%	  loadList {1xN Load}             -- Cell list of loads.
+%	  nNode    (int)                  -- Number of nodes.
+%	  nElem    (int)                  -- Number of elements.
+%	  nDof     (int)                  -- Number of DOFs.
+%	  mass     (int)                  -- Total mass of the structure [kg].
 %	SdivStruct (struct) -- Subdivised structure, with fields:
-%	  nodeList {1 x N Node}             -- Cell list of nodes.
-%	  elemList {1 x N Elem}             -- Cell list of elements.
-%	  loadList {1 x N Load}             -- Cell list of loads.
-%	  cmList   {1 x N ConcentratedMass} -- Cell list of concentrated masses.
-%	  nNode    (int)                    -- Number of nodes.
-%	  nElem    (int)                    -- Number of elements.
-%	  nDof     (int)                    -- Number of DOFs.
-%	FemMat (struct) -- Global structural matrices, with fields:
+%	  nodeList {1xN Node}             -- Cell list of nodes.
+%	  elemList {1xN Elem}             -- Cell list of elements.
+%	  loadList {1xN Load}             -- Cell list of loads.
+%	  cmList   {1xN ConcentratedMass} -- Cell list of concentrated masses.
+%	  nNode    (int)                  -- Number of nodes.
+%	  nElem    (int)                  -- Number of elements.
+%	  nDof     (int)                  -- Number of DOFs.
+%	AlgSys (struct) -- Parameters of the discrete algebraic system, with fields:
 %	  K_free   (nDofxnDof double) -- Global siffness matrix, without constraints.
 %	  M_free   (nDofxnDof double) -- Global mass     matrix, without constraints.
 %	  K        (NxN double)       -- Global siffness matrix, with    constraints.
 %	  M        (NxN double)       -- Global mass     matrix, with    constraints.
 %	  cstrMask (1xnDof bool)      -- Index on constrained DOFs.
 %	FemSol (struct) -- Solution of the FEM simulation, with fields:
-%	  frequencyHertz (1 x nMode double)    -- Natural frequencies [Hz].
-%	  frequencyRad   (1 x nMode double)    -- Natural frequencies [rad/s].
-%	  mode           (nDof x nMode double) -- Modal displacement vectors.
-%	  nMode          (int)                 -- Number of computed first modes.
-%	  nDof           (int)                 -- Number of DOFs.
-%	  massFromRbm    (double)              -- Mass calculated from RBM [kg].
+%	  frequencyHertz (1xnMode double)    -- Natural frequencies [Hz].
+%	  frequencyRad   (1xnMode double)    -- Natural frequencies [rad/s].
+%	  mode           (nDofxnMode double) -- Modal displacement vectors.
+%	  nMode          (int)               -- Number of computed first modes.
+%	  nDof           (int)               -- Number of DOFs.
+%	  massFromRbm    (double)            -- Mass calculated from RBM [kg].
 
 % Reset class internal states.
 clear Node Elem;
@@ -54,15 +54,15 @@ end
 
 % 2. K and M
 
-[FemMat.K_free, FemMat.M_free] = build_global_matrices(SdivStruct);
+[AlgSys.K_free, AlgSys.M_free] = build_global_matrices(SdivStruct);
 
-FemMat.cstrMask = build_cstr_mask(SdivStruct);
+AlgSys.cstrMask = build_cstr_mask(SdivStruct);
 
-[FemMat.K, FemMat.M] = apply_boundary_conditions(FemMat);
+[AlgSys.K, AlgSys.M] = apply_boundary_conditions(AlgSys);
 
 % 3. Eigenvalue problem solving
 
-FemSol = solve_eigenvalue_problem(SdivStruct, FemMat, nMode, 's');
+FemSol = solve_eigenvalue_problem(SdivStruct, AlgSys, nMode, 's');
 
 % 4. Eigenmodes plot
 
@@ -72,7 +72,7 @@ end
 
 % 5. Total mass and sanity checks
 
-FemSol.massFromRbm = check_rbm(FemMat.M_free, SdivStruct.nNode, BareStruct.mass);
+FemSol.massFromRbm = check_rbm(AlgSys.M_free, SdivStruct.nNode, BareStruct.mass);
 
 end
 
@@ -86,13 +86,13 @@ function SdivStruct = subdivise_structure(BareStruct, sdiv)
 %	sdiv       (int)    -- Number of subsivisions desired.
 % Return:
 %	SdivStruct (struct) -- Subdivised structure, with fields:
-%	  nodeList {1 x N Node}             -- Cell list of nodes.
-%	  elemList {1 x N Elem}             -- Cell list of elements.
-%	  loadList {1 x N Load}             -- Cell list of loads.
-%	  cmList   {1 x N ConcentratedMass} -- Cell list of concentrated masses.
-%	  nNode    (int)                    -- Number of nodes.
-%	  nElem    (int)                    -- Number of elements.
-%	  nDof     (int)                    -- Number of DOFs.
+%	  nodeList {1xN Node}             -- Cell list of nodes.
+%	  elemList {1xN Elem}             -- Cell list of elements.
+%	  loadList {1xN Load}             -- Cell list of loads.
+%	  cmList   {1xN ConcentratedMass} -- Cell list of concentrated masses.
+%	  nNode    (int)                  -- Number of nodes.
+%	  nElem    (int)                  -- Number of elements.
+%	  nDof     (int)                  -- Number of DOFs.
 
 % Preallocate the node and element lists of the subdivised structure.
 nNode    = BareStruct.nNode + (sdiv-1) * BareStruct.nElem;
@@ -135,7 +135,6 @@ for i = 1:BareStruct.nElem
 	% TODO: try to find a more readable way of doing this.
 	nodeList(BareStruct.nNode + (i-1)*(numel(snode)-2) + (1:(numel(snode)-2))) = snode(2:end-1);
 	elemList((i-1)*(numel(selem)) + (1:numel(selem))) = selem;
-
 end
 
 % Build return data structure.
@@ -192,8 +191,8 @@ function [K_free, M_free] = build_global_matrices(SdivStruct)
 % Argument:
 %	SdivStruct (struct) -- Subdivised structure.
 % Returns:
-%	K_free (nDof x nDof double) -- Global free stiffness matrix.
-%	M_free (nDof x nDof double) -- Global free mass      matrix.
+%	K_free (nDofxnDof double) -- Global free stiffness matrix.
+%	M_free (nDofxnDof double) -- Global free mass      matrix.
 
 K_free = zeros(SdivStruct.nDof);
 M_free = zeros(SdivStruct.nDof);
@@ -232,39 +231,40 @@ for node = SdivStruct.nodeList
 end
 end
 
-function [K, M] = apply_boundary_conditions(FemMat)
+function [K, M] = apply_boundary_conditions(AlgSys)
 % APPLY_BOUNDARY_CONDITIONS  Apply the boundary conditions.
 %
 % argument:
-%	FemMat (struct) -- Global structural matrices.
+%	AlgSys (struct) -- Global structural matrices.
 % Returns:
-%	K (N x N double) -- Global stiffness matrix.
-%	M (N x N double) -- Global mass matrix.
+%	K (NxN double) -- Global stiffness matrix.
+%	M (NxN double) -- Global mass matrix.
 
 % Supress rows and columns corresponding to clamped node DOFs.
-K = FemMat.K_free(~FemMat.cstrMask, ~FemMat.cstrMask);
-M = FemMat.M_free(~FemMat.cstrMask, ~FemMat.cstrMask);
+K = AlgSys.K_free(~AlgSys.cstrMask, ~AlgSys.cstrMask);
+M = AlgSys.M_free(~AlgSys.cstrMask, ~AlgSys.cstrMask);
 end
 
 %% 3. Solve the eigenvalue problem
 
-function FemSol = solve_eigenvalue_problem(SdivStruct, FemMat, nMode, solver)
+function FemSol = solve_eigenvalue_problem(SdivStruct, AlgSys, nMode, solver)
 % SOLVE_EIGENVALUE_PROBLEM  Get the natural frequencies and corresponding modes.
 %
 % Arguments:
 %	SdivStruct (struct) -- Subdivised structure.
-%	FemMat     (struct) -- Global structural matrices.
+%	AlgSys     (struct) -- Parameters of the discrete algebraic system.
 %	nMode      (int)    -- Number of first modes desired.
 %	solver     (char)   -- Type of solver.
 %	  'f' -> Use the eig  solver (better for small full matrices).
 %	  's' -> Use the eigs solver (better for large sparse matrices).
 % Returns:
 %	FemSol (struct) -- Solution of the FEM simulation, with fields:
-%	  frequencyHertz (1 x nMode double)    -- Natural frequencies, in hertz.
-%	  frequencyRad   (1 x nMode double)    -- Natural frequencies, in rad/s.
-%	  mode           (nDof x nMode double) -- Modal displacement vectors.
-%	  nMode          (int)                 -- Number of computed first modes.
-%	  nDof           (int)                 -- Number of DOFs.
+%	  frequencyHertz (1xnMode double)    -- Natural frequencies, in hertz.
+%	  frequencyRad   (1xnMode double)    -- Natural frequencies, in rad/s.
+%	  mode           (nDofxnMode double) -- Modal displacement vectors.
+%	  nMode          (int)               -- Number of computed first modes.
+%	  nDof           (int)               -- Number of DOFs.
+
 switch solver
 	case 's'
 		[frequencyHertz, frequencyRad, mode] = solve_eigs(nMode);
@@ -277,8 +277,7 @@ end
 	function [frequencyHetz, frequencyRad, mode] = solve_eigs(nMode)
 		% Solve the eigenvalue problem.
 		sigma = 'smallestabs';  % Could be advised to use a scalar value.
-		% TODO: try to make the 'isSymmetricDefinite' option working.
-		[eigvecs, eigvals] = eigs(FemMat.K, FemMat.M, nMode, sigma);
+		[eigvecs, eigvals] = eigs(AlgSys.K, AlgSys.M, nMode, sigma);
 
 		% Extract the natural frequencies.
 		frequencyRad  = sqrt(diag(eigvals));
@@ -286,12 +285,12 @@ end
 
 		% Build modal displacements: add clamped nodes.
 		mode = zeros(SdivStruct.nDof, nMode);
-		mode(~FemMat.cstrMask, :) = eigvecs;
+		mode(~AlgSys.cstrMask, :) = eigvecs;
 	end
 
 	function [frequencyHertz, frequencyRad, mode] = solve_eig(nMode)
 		% Solve the eigenvalue problem.
-		[eigvecs, eigvals] = eig(FemMat.K, FemMat.M);
+		[eigvecs, eigvals] = eig(AlgSys.K, AlgSys.M);
 
 		% Sort in ascending order.
 		[eigvals, ind] = sort(diag(eigvals));
@@ -305,7 +304,7 @@ end
 
 		% Build modal displacements: add clamped nodes.
 		mode = zeros(SdivStruct.nDof, nMode);
-		mode(~FemMat.cstrMask, :) = eigvecs;
+		mode(~AlgSys.cstrMask, :) = eigvecs;
 	end
 
 	FemSol.frequencyHertz = frequencyHertz;
@@ -380,9 +379,9 @@ function varargout = check_rbm(M_free, nNode, mass)
 % one calculated with this RBM.
 %
 % Arguments:
-%	M_free (nDof x nDof double) -- Global free mass matrix.
-%	nNode  (int)                -- Number of structural nodes.
-%	mass   (double)             -- Mass of the entire structure [kg].
+%	M_free (nDofxnDof double) -- Global free mass matrix.
+%	nNode  (int)              -- Number of structural nodes.
+%	mass   (double)           -- Mass of the entire structure [kg].
 % Return:
 %	massFromRbm (double, optional) -- Mass calculated from RBM [kg].
 

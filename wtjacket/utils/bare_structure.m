@@ -129,7 +129,7 @@ cmList = {ConcentratedMass(nodeList{22})};
 loadAmplitude = Cst.TAIL_MASS * Cst.TAIL_SPEED * Cst.MOMENTUM_TRANSFER / Cst.IMPACT_DURATION;
 loadDirection = [cosd(Cst.FORCE_DIRECTION), -sind(Cst.FORCE_DIRECTION), 0];
 
-loadList = {Load(nodeList{18}, loadDirection, loadAmplitude, Cst.LOAD_FREQUENCY_HERTZ)};
+loadList = {HarmonicLoad(nodeList{18}, loadDirection, loadAmplitude, Cst.LOAD_FREQUENCY_HERTZ)};
 
 %% Total mass
 
