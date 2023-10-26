@@ -21,7 +21,7 @@ classdef Load
 			% SET_DISCRETE_LOAD  Create a sample of time-discretized load.
 			%
 			% Arguments:
-			%	nDof       (double)     -- Number of structural DOFs.
+			%	nDof       (double)         -- Number of structural DOFs.
 			%	timeSample (1xnTime double) -- Time sample [s].
 			% Return:
 			%	DiscreteLoad (struct) -- time-discretized load, with fields:

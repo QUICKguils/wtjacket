@@ -9,11 +9,10 @@ function NewmarkSol = newmark(M, C, K, TimeParams, loadSample)
 %	loadSample (nDofxnTime double) -- time-discretized load sample [N].
 % Return:
 %	NewmarkSol (struct) -- Solution of the time integration, with fields:
-%	  q          (nDofxnTime double) -- Displacements [m].
-%	  qd         (nDofxnTime double) -- Velocities [m/s].
-%	  qdd        (nDofxnTime double) -- Accelerations [m/s²].
-%	  timeSample (1xnTime)           -- Time sample used [s].
-%	  loadSample (nDofxnTime double) -- time-discretized load sample [N].
+%	  q    (nDofxnTime double) -- Displacements [m].
+%	  qd   (nDofxnTime double) -- Velocities [m/s].
+%	  qdd  (nDofxnTime double) -- Accelerations [m/s²].
+%	  name (1xN char)          -- Name of the method.
 %
 % This is a straightforward Matlab implementation of the algorithm
 % explained in the reference book, section 7.2.1. page 522.
@@ -57,10 +56,8 @@ for n = 1:TimeParams.numel-1
 	q(:, n+1)  = q_guess(:, n+1) + beta*h(n)^2*qdd(:, n+1);
 end
 
-NewmarkSol.q          = q;
-NewmarkSol.qdot       = qd;
-NewmarkSol.qddot      = qdd;
-NewmarkSol.timeSample = TimeParams.sample;
-NewmarkSol.loadSample = loadSample;
-NewmarkSol.name       = 'Newmark time integration';
+NewmarkSol.q     = q;
+NewmarkSol.qdot  = qd;
+NewmarkSol.qddot = qdd;
+NewmarkSol.name  = 'Newmark time integration';
 end

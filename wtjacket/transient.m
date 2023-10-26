@@ -1,4 +1,4 @@
-function [AlgSys, ModalSup, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts)
+function [AlgSys, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts)
 % TRANSIENT  Transient response due to a harmonic excitation.
 %
 % Arguments:
@@ -19,21 +19,17 @@ function [AlgSys, ModalSup, TransientSol] = transient(Cst, SdivStruct, AlgSys, F
 %	  C        (NxN double)       -- Proportional damping matrix, with constraints.
 %	  eps      (1xNmode double)   -- Proportional damping ratios.
 %	  cstrMask (1xnDof bool)      -- Index on constrained DOFs.
-%	ModalSup (struct) -- Modal superposition parameters, with fields:
-%	  phi   (nModexnTime double) -- Modal participation factors.
-%	  nu    (nModexnTime double) -- Modal time functions.
-%	  nMode (int)                -- Number of modes used.
 %	TransientSol (struct) -- Solution of the transient problem, with fields:
-%	  ModeDisplacementSol (struct) -- By using the mode displacement method.
-%	  ModeAccelerationSol (struct) -- By using the mode acceleration method.
-%	  NewmarkSol          (struct) -- By using the Newmark's time integration.
-
-% TODO:
-% There's redundant and/or unused data in returned structure.
+%	  TimeParams          (struct) -- Temporal parameters of the problem.
+%	  DiscreteLoad        (struct) -- time-discretized load.
+%	  ModalSup            (struct) -- Modal superposition parameters.
+%	  ModeDisplacementSol (struct) -- Solution from the mode displacement method.
+%	  ModeAccelerationSol (struct) -- Solution from the mode acceleration method.
+%	  NewmarkSol          (struct) -- Solution from the Newmark's time integration.
 
 % 1. Temporal parameters
-% TODO: see if better to pass that in argument of transient().
 
+% TODO: see if better to pass that in argument of transient().
 timeSample = 0:0.001:10;
 TimeParams = set_time_parameters(timeSample, Cst.INITIAL_CONDITIONS);
 
@@ -45,8 +41,6 @@ eps = [Cst.DAMPING_RATIO, Cst.DAMPING_RATIO];
 % 3. Time-discretized load
 
 % Choose the load to study.
-% NOTE: for the sake of completeness.
-% By the way, only one load was assigned in this project.
 lookupLoadLabel = 1;
 ThisLoad = SdivStruct.loadList{lookupLoadLabel};
 
@@ -60,18 +54,24 @@ ModalSup = modal_superposition(AlgSys, FemSol, TimeParams, DiscreteLoad.sample, 
 % 5. Compute the displacements
 
 ModeDisplSol = mode_displacement(FemSol, ModalSup);
-ModeAccelSol = mode_acceleration(AlgSys, FemSol, ModalSup);
+ModeAccelSol = mode_acceleration(AlgSys, FemSol, ModalSup, DiscreteLoad.sample);
 % NewmarkSol   = newmark(AlgSys.M, Damping.C, AlgSys.K, TimeParams, DiscreteLoad.sample);
 
 % 6. Plot the displacements
 
 if contains(opts, 'p')
 	lookupNodeLabels = [18, 22];
-	plot_displacement(ModeDisplSol, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
-	plot_displacement(ModeAccelSol, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
-% 	plot_displacement(NewmarkSol,   lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
+	plot_displacement(ModeDisplSol, TimeParams.sample, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
+	plot_displacement(ModeAccelSol, TimeParams.sample, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
+% 	plot_displacement(NewmarkSol,   TimeParams.sample, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
 end
 
+
+% 7. Gather the solution found.
+
+TransientSol.TimeParams       = TimeParams;
+TransientSol.DiscreteLoad     = DiscreteLoad;
+TransientSol.ModalSup         = ModalSup;
 TransientSol.ModeDisplacement = ModeDisplSol;
 TransientSol.ModeAcceleration = ModeAccelSol;
 % TransientSol.Newmark          = NewmarkSol;
@@ -124,6 +124,14 @@ end
 
 function ModalSup = modal_superposition(AlgSys, FemSol, TimeParams, loadSample, nMode)
 % MODAL_SUPERPOSITION  Compute the modal superposition, from the first vibration modes.
+%
+% Arguments:
+%
+% Return:
+%	ModalSup (struct) -- Modal superposition parameters, with fields:
+%	  phi   (nModexnTime double) -- Modal participation factors.
+%	  nu    (nModexnTime double) -- Modal time functions.
+%	  nMode (int)                -- Number of modes used.
 
 if nMode > FemSol.nMode
 	warning("Only the first " + num2str(FemSol.nMode) + " modes have been computed.");
@@ -150,8 +158,6 @@ for r = 1:nMode
 	eta(r, :)    = nuTransient + nuPermanent;
 end
 
-ModalSup.timeSample = t;
-ModalSup.loadSample = loadSample;
 ModalSup.phi        = phi;
 ModalSup.eta        = eta;
 ModalSup.nMode      = nMode;
@@ -162,49 +168,53 @@ end
 function ModeDisplSol = mode_displacement(FemSol, ModalSup)
 % MODE_DISPLACEMENT  Compute the displacements with the mode displacement method.
 
-ModeDisplSol.q = FemSol.mode(:, 1:ModalSup.nMode) * ModalSup.eta;
-ModeDisplSol.timeSample = ModalSup.timeSample;
+ModeDisplSol.q    = FemSol.mode(:, 1:ModalSup.nMode) * ModalSup.eta;
 ModeDisplSol.name = 'mode displacement';
 end
 
-function ModeAccelSol = mode_acceleration(AlgSys, FemSol, ModalSup)
+function ModeAccelSol = mode_acceleration(AlgSys, FemSol, ModalSup, loadSample)
 % MODE_ACCELERATION  Compute the displacements with the mode acceleration method.
 
-loadSampleCstr = ModalSup.loadSample(~AlgSys.cstrMask, :);
+% Mode displacement method.
+ModeDisplSol = mode_displacement(FemSol, ModalSup);
+
+% Static response of the complete structure.
+loadSampleCstr = loadSample(~AlgSys.cstrMask, :);
 completeStaticResponseCstr = AlgSys.K \ loadSampleCstr;
-completeStaticResponse = zeros(size(ModalSup.loadSample));
+completeStaticResponse = zeros(size(loadSample));
 completeStaticResponse(~AlgSys.cstrMask, :) = completeStaticResponseCstr;
 
-partialStaticResponse  = FemSol.mode(:, 1:ModalSup.nMode) * (ModalSup.phi ./ FemSol.frequencyRad(1:ModalSup.nMode).^2);
+% Static response for modes 1 to nMode, already included
+% in the mode displacement method.
+partialStaticResponse = FemSol.mode(:, 1:ModalSup.nMode) * (ModalSup.phi ./ FemSol.frequencyRad(1:ModalSup.nMode).^2);
 
-ModeAccelSol.q = FemSol.mode(:, 1:ModalSup.nMode) * ModalSup.eta + completeStaticResponse -partialStaticResponse;
-ModeAccelSol.timeSample = ModalSup.timeSample;
+ModeAccelSol.q    = ModeDisplSol.q + completeStaticResponse -partialStaticResponse;
 ModeAccelSol.name = 'mode acceleration';
 end
 
 %% 6. Plot the displacements
 
-function plot_displacement(TransientSol, nodeLabels, dir, nodeList, nMode)
+function plot_displacement(TransientSol, timeSample, lookupNodeLabels, loadDirection, nodeList, nMode)
 % PLOT_DISPLACEMENT  Plot the time evolution of the displacements.
 
-allclose(norm(dir), 1);
+allclose(norm(loadDirection), 1);
 
 figure("WindowStyle", "docked");
 
-nNode = numel(nodeLabels);
+nNode = numel(lookupNodeLabels);
 for i = 1:nNode
-	qX = TransientSol.q(nodeList{nodeLabels(i)}.dof(1), :) * dir(1);
-	qY = TransientSol.q(nodeList{nodeLabels(i)}.dof(2), :) * dir(2);
-	qZ = TransientSol.q(nodeList{nodeLabels(i)}.dof(3), :) * dir(3);
+	qX = TransientSol.q(nodeList{lookupNodeLabels(i)}.dof(1), :) * loadDirection(1);
+	qY = TransientSol.q(nodeList{lookupNodeLabels(i)}.dof(2), :) * loadDirection(2);
+	qZ = TransientSol.q(nodeList{lookupNodeLabels(i)}.dof(3), :) * loadDirection(3);
 
 	qDir = qX + qY + qZ;
 
 	subplot(nNode, 1, i);
-	plot(TransientSol.timeSample, qDir);
+	plot(timeSample, qDir);
 	xlabel("Time (s)");
-	ylabel("Displacement (dir: [" + num2str(dir, '%.3f  ') + "])");
+	ylabel("Displacement (dir: [" + num2str(loadDirection, '%.3f  ') + "])");
 	title('Transient response', ...
-		['(node: ', num2str(nodeLabels(i)), ...
+		['(node: ', num2str(lookupNodeLabels(i)), ...
 		', method: ', TransientSol.name, ...
 		', order: ', num2str(nMode), ')']);
 	grid;

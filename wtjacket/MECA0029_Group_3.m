@@ -51,7 +51,7 @@ Cst = load_constants();
 [BareStruct, SdivStruct, AlgSys, FemSol] = modeling(Cst, sdiv, nMode, opts);
 
 % 2. Transient response.
-[AlgSys, ModalSup, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts);
+[AlgSys, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts);
 
 % 3. Reduction methods.
 reduction(opts);
@@ -64,7 +64,6 @@ if contains(opts, 's')
 	save(fullfile(resDirectory, "subdivisedStructure.mat"), "-struct", "SdivStruct");
 	save(fullfile(resDirectory, "algebraicSystem.mat"),     "-struct", "AlgSys");
 	save(fullfile(resDirectory, "FemSolution.mat"),         "-struct", "FemSol");
-	save(fullfile(resDirectory, "modalSuperposition.mat"),  "-struct", "ModalSup");
 	save(fullfile(resDirectory, "transientSolution.mat"),   "-struct", "TransientSol");
 end
 
