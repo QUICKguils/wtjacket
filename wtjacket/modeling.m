@@ -27,18 +27,22 @@ function [BareStruct, SdivStruct, AlgSys, FemSol] = modeling(Cst, sdiv, nMode, o
 %	  nElem    (int)                  -- Number of elements.
 %	  nDof     (int)                  -- Number of DOFs.
 %	AlgSys (struct) -- Parameters of the discrete algebraic system, with fields:
-%	  K_free   (nDofxnDof double) -- Global siffness matrix, without constraints.
-%	  M_free   (nDofxnDof double) -- Global mass     matrix, without constraints.
-%	  K        (NxN double)       -- Global siffness matrix, with    constraints.
-%	  M        (NxN double)       -- Global mass     matrix, with    constraints.
-%	  cstrMask (1xnDof bool)      -- Index on constrained DOFs.
+%	  K_free    (nDofxnDof double) -- Global siffness matrix, without constraints.
+%	  M_free    (nDofxnDof double) -- Global mass     matrix, without constraints.
+%	  K         (NxN double)       -- Global siffness matrix, with    constraints.
+%	  M         (NxN double)       -- Global mass     matrix, with    constraints.
+%	  nDof_free (int)              -- Number of DOFs of the free structure.
+%	  nDof      (int)              -- Number of DOFs of the constrained structure.
+%	  nCstr     (int)              -- Number of constrained DOFs.
+%	  cstrMask  (1xnDof bool)      -- Index on constrained DOFs.
 %	FemSol (struct) -- Solution of the FEM simulation, with fields:
 %	  frequencyHertz (1xnMode double)    -- Natural frequencies [Hz].
 %	  frequencyRad   (1xnMode double)    -- Natural frequencies [rad/s].
 %	  mode           (nDofxnMode double) -- Modal displacement vectors.
 %	  nMode          (int)               -- Number of computed first modes.
-%	  nDof           (int)               -- Number of DOFs.
 %	  massFromRbm    (double)            -- Mass calculated from RBM [kg].
+
+% TODO: register cstr syst dims.
 
 % Reset class internal states.
 clear Node Elem;
@@ -59,6 +63,8 @@ end
 AlgSys.cstrMask = build_cstr_mask(SdivStruct);
 
 [AlgSys.K, AlgSys.M] = apply_boundary_conditions(AlgSys);
+
+[AlgSys.nDof_free, AlgSys.nDof, AlgSys.nCstr] = get_system_dimensions(AlgSys);
 
 % 3. Eigenvalue problem solving
 
@@ -245,6 +251,16 @@ K = AlgSys.K_free(~AlgSys.cstrMask, ~AlgSys.cstrMask);
 M = AlgSys.M_free(~AlgSys.cstrMask, ~AlgSys.cstrMask);
 end
 
+function [nDof_free, nDof, nCstr] = get_system_dimensions(AlgSys)
+% GET_SYSTEM_DIMENSIONS  Get the dimensions of global algebraic systems.
+
+nDof_free = size(AlgSys.K_free, 1);
+nDof      = size(AlgSys.K, 1);
+nCstr     = sum(AlgSys.cstrMask);
+
+assert(nDof_free == nDof + nCstr, 'Ow shit');
+end
+
 %% 3. Solve the eigenvalue problem
 
 function FemSol = solve_eigenvalue_problem(SdivStruct, AlgSys, nMode, solver)
@@ -263,7 +279,6 @@ function FemSol = solve_eigenvalue_problem(SdivStruct, AlgSys, nMode, solver)
 %	  frequencyRad   (1xnMode double)    -- Natural frequencies, in rad/s.
 %	  mode           (nDofxnMode double) -- Modal displacement vectors.
 %	  nMode          (int)               -- Number of computed first modes.
-%	  nDof           (int)               -- Number of DOFs.
 
 switch solver
 	case 's'
@@ -311,7 +326,6 @@ end
 	FemSol.frequencyRad   = frequencyRad;
 	FemSol.mode           = mode;
 	FemSol.nMode          = nMode;
-	FemSol.nDof           = SdivStruct.nDof;
 end
 
 %% 4. Eigenmodes plot
@@ -395,8 +409,5 @@ massFromRbm = rbm' * M_free * rbm;
 allclose(mass, massFromRbm);
 
 % Return the calculated mass, if wanted.
-varargout = cell(nargout, 1);
-for k = 1:nargout
-	varargout{k} = massFromRbm;
-end
+varargout{1} = massFromRbm;
 end

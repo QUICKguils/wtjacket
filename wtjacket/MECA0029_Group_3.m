@@ -20,7 +20,7 @@ end
 optargs = {3, 8, 'ps'};
 
 % Overwrite default value of optional inputs.
-optargs(1:numel(varargin)) = varargin;
+optargs(1:nargin) = varargin;
 
 % Place optional args in memorable variable names.
 [sdiv, nMode, opts] = optargs{:};

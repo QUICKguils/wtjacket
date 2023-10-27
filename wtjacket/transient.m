@@ -12,13 +12,16 @@ function [AlgSys, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMo
 %	  'p' -> Enable plots creation.
 % Returns:
 %	AlgSys   (struct) -- Parameters of the discrete algebraic system, with fields:
-%	  K_free   (nDofxnDof double) -- Global siffness matrix, without constraints.
-%	  M_free   (nDofxnDof double) -- Global mass matrix, without constraints.
-%	  K        (NxN double)       -- Global siffness matrix, with constraints.
-%	  M        (NxN double)       -- Global mass matrix, with constraints.
-%	  C        (NxN double)       -- Proportional damping matrix, with constraints.
-%	  eps      (1xNmode double)   -- Proportional damping ratios.
-%	  cstrMask (1xnDof bool)      -- Index on constrained DOFs.
+%	  K_free    (nDofxnDof double) -- Global siffness matrix, without constraints.
+%	  M_free    (nDofxnDof double) -- Global mass matrix, without constraints.
+%	  K         (NxN double)       -- Global siffness matrix, with constraints.
+%	  M         (NxN double)       -- Global mass matrix, with constraints.
+%	  C         (NxN double)       -- Proportional damping matrix, with constraints.
+%	  eps       (1xNmode double)   -- Proportional damping ratios.
+%	  cstrMask  (1xnDof bool)      -- Index on constrained DOFs.
+%	  nDof_free (int)              -- Number of DOFs of the free structure.
+%	  nDof      (int)              -- Number of DOFs of the constrained structure.
+%	  nCstr     (int)              -- Number of constrained DOFs.
 %	TransientSol (struct) -- Solution of the transient problem, with fields:
 %	  TimeParams          (struct) -- Temporal parameters of the problem.
 %	  DiscreteLoad        (struct) -- time-discretized load.
@@ -30,7 +33,7 @@ function [AlgSys, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMo
 % 1. Temporal parameters
 
 % TODO: see if better to pass that in argument of transient().
-timeSample = 0:0.001:10;
+timeSample = 0:0.01:10;
 TimeParams = set_time_parameters(timeSample, Cst.INITIAL_CONDITIONS);
 
 % 2. Proportional damping parameters
@@ -45,7 +48,7 @@ lookupLoadLabel = 1;
 ThisLoad = SdivStruct.loadList{lookupLoadLabel};
 
 % Create the time-discretized load.
-DiscreteLoad = ThisLoad.set_discrete_load(FemSol.nDof, TimeParams.sample);
+DiscreteLoad = ThisLoad.set_discrete_load(AlgSys.nDof_free, TimeParams.sample);
 
 % 4. Compute the modal superposition
 
@@ -55,7 +58,7 @@ ModalSup = modal_superposition(AlgSys, FemSol, TimeParams, DiscreteLoad.sample, 
 
 ModeDisplSol = mode_displacement(FemSol, ModalSup);
 ModeAccelSol = mode_acceleration(AlgSys, FemSol, ModalSup, DiscreteLoad.sample);
-% NewmarkSol   = newmark(AlgSys.M, Damping.C, AlgSys.K, TimeParams, DiscreteLoad.sample);
+NewmarkSol   = newmark(AlgSys, TimeParams, DiscreteLoad.sample);
 
 % 6. Plot the displacements
 
@@ -63,18 +66,18 @@ if contains(opts, 'p')
 	lookupNodeLabels = [18, 22];
 	plot_displacement(ModeDisplSol, TimeParams.sample, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
 	plot_displacement(ModeAccelSol, TimeParams.sample, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
-% 	plot_displacement(NewmarkSol,   TimeParams.sample, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
+	plot_displacement(NewmarkSol,   TimeParams.sample, lookupNodeLabels, ThisLoad.direction, SdivStruct.nodeList, nMode);
 end
 
 
-% 7. Gather the solution found.
+% 7. Gather the solutions found
 
 TransientSol.TimeParams       = TimeParams;
 TransientSol.DiscreteLoad     = DiscreteLoad;
 TransientSol.ModalSup         = ModalSup;
 TransientSol.ModeDisplacement = ModeDisplSol;
 TransientSol.ModeAcceleration = ModeAccelSol;
-% TransientSol.Newmark          = NewmarkSol;
+TransientSol.Newmark          = NewmarkSol;
 
 end
 
@@ -92,7 +95,7 @@ TimeParams.steps  = [diff(timeSample), timeSample(end)-timeSample(end-1)];
 TimeParams.start  = timeSample(1);
 TimeParams.end    = timeSample(end);
 TimeParams.numel  = numel(timeSample);
-TimeParams.ic     = initialConditions;
+TimeParams.initialConditions = initialConditions;
 end
 
 %% 2. Set the proportional damping parameters
@@ -142,8 +145,8 @@ phi = zeros(nMode, TimeParams.numel);
 eta = zeros(nMode, TimeParams.numel);
 
 % Aliases.
-A   = TimeParams.ic(1);
-B   = TimeParams.ic(2);
+A   = TimeParams.initialConditions(1);
+B   = TimeParams.initialConditions(2);
 t   = TimeParams.sample;
 eps = AlgSys.eps;
 

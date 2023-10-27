@@ -1,5 +1,5 @@
-function modeling_convergence(varargin)
-% MODELING_CONVERGENCE  Analyze the convergence of the simulation carried out.
+function convergence_fem(varargin)
+% CONVERGENCE_FEM  Analyze the convergence of the FEM solutions.
 %
 % Arguments:
 %	sdivSet (1 x N int) -- Set of desired number of subdivisions (default: 1:8).
