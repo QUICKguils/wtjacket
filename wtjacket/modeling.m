@@ -1,4 +1,4 @@
-function [BareStruct, SdivStruct, AlgSys, FemSol] = modeling(Cst, sdiv, nMode, opts)
+function varargout = modeling(Cst, sdiv, nMode, opts)
 % MODELING  Model of the wt jacket, using 3D beam elements.
 %
 % Arguments:
@@ -79,6 +79,11 @@ end
 % 5. Total mass and sanity checks
 
 FemSol.massFromRbm = check_rbm(AlgSys.M_free, SdivStruct.nNode, BareStruct.mass);
+
+% 7. Return the relevant calculated data
+
+optrets = {BareStruct, SdivStruct, AlgSys, FemSol};
+varargout(1:nargout) = optrets(1:nargout);
 
 end
 

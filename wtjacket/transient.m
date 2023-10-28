@@ -1,4 +1,4 @@
-function [AlgSys, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts)
+function varargout = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts)
 % TRANSIENT  Transient response due to a harmonic excitation.
 %
 % Arguments:
@@ -70,7 +70,7 @@ if contains(opts, 'p')
 end
 
 
-% 7. Gather the solutions found
+% 7. Gather and return the relevant calculated data
 
 TransientSol.TimeParams       = TimeParams;
 TransientSol.DiscreteLoad     = DiscreteLoad;
@@ -78,6 +78,9 @@ TransientSol.ModalSup         = ModalSup;
 TransientSol.ModeDisplacement = ModeDisplSol;
 TransientSol.ModeAcceleration = ModeAccelSol;
 TransientSol.Newmark          = NewmarkSol;
+
+optrets = {AlgSys, TransientSol};
+varargout(1:nargout) = optrets(1:nargout);
 
 end
 
