@@ -1,5 +1,5 @@
-function convergence_transient(TransientSol, SdivStruct)
-% CONVERGENCE_TRANSIENT  Analyze the convergence of the transient solutions.
+function transient_analysis(TransientSol, SdivStruct)
+% TRANSIENT_ANALYSIS  Analyze the results of the transient part.
 
 % TODO:
 % Some of these plots don't analyze the convergence of the solution, but
