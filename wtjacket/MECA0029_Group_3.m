@@ -54,7 +54,7 @@ Cst = load_constants();
 [AlgSys, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts);
 
 % 3. Reduction methods.
-[frequencyHertz] = reduction(SdivStruct, AlgSys, nMode);
+[frequencyHertz] = reduction(SdivStruct, AlgSys, nMode)
 
 %% Save generated data
 
