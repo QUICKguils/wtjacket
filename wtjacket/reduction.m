@@ -3,7 +3,7 @@ function varargout = reduction(opts)
 
 % X. Gather and return the relevant calculated data
 
-optrets = {AlgSys, TransientSol};
+optrets = {};
 varargout(1:nargout) = optrets(1:nargout);
 
 end

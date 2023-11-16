@@ -17,5 +17,22 @@ classdef HarmonicLoad < Load
 			hLoad.frequencyHertz = frequencyHertz;
 			hLoad.frequencyRad   = frequencyHertz * 2*pi;
 		end
+
+		function DiscreteLoad = set_discrete_load(load, nDof, timeSample)
+		% SET_DISCRETE_LOAD  Append properties to the superclass method.
+
+			DiscreteLoad = set_discrete_load@Load(load, nDof, timeSample);
+
+			% Keep the properties of the HarmonicLoad object.
+			DiscreteLoad.amplitude      = load.amplitude;
+			DiscreteLoad.frequencyHertz = load.frequencyHertz;
+			DiscreteLoad.frequencyRad   = load.frequencyRad;
+
+			% Append the spatial ditribution of the load across the DOFs.
+			DiscreteLoad.spatial = zeros(nDof, 1);
+			DiscreteLoad.spatial(load.node.dof(1)) = load.amplitude * load.direction(1);
+			DiscreteLoad.spatial(load.node.dof(2)) = load.amplitude * load.direction(2);
+			DiscreteLoad.spatial(load.node.dof(3)) = load.amplitude * load.direction(3);
+		end
 	end
 end

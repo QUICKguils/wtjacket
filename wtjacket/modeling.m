@@ -42,8 +42,6 @@ function varargout = modeling(Cst, sdiv, nMode, opts)
 %	  nMode          (int)               -- Number of computed first modes.
 %	  massFromRbm    (double)            -- Mass calculated from RBM [kg].
 
-% TODO: register cstr syst dims.
-
 % Reset class internal states.
 clear Node Elem;
 

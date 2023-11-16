@@ -30,6 +30,11 @@ function varargout = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts)
 %	  ModeAccelerationSol (struct) -- Solution from the mode acceleration method.
 %	  NewmarkSol          (struct) -- Solution from the Newmark's time integration.
 
+% TODO:
+% - add doc for functions
+% - make option to select the desired method.
+%   (will be more efficient for convergence study).
+
 % 1. Temporal parameters
 
 % TODO: see if better to pass that in argument of transient().
@@ -84,7 +89,7 @@ varargout(1:nargout) = optrets(1:nargout);
 
 end
 
-%% 1. Set the time discretization
+%% 1. Temporal parameters
 
 function TimeParams = set_time_parameters(timeSample, initialConditions)
 % SET_TIME_PARAMETERS  Set the temporal parameters of the problem.
@@ -135,6 +140,7 @@ function ModalSup = modal_superposition(AlgSys, FemSol, TimeParams, loadSample, 
 %
 % Return:
 %	ModalSup (struct) -- Modal superposition parameters, with fields:
+%	  mu    (nModex1 double)     -- Generalized masses.
 %	  phi   (nModexnTime double) -- Modal participation factors.
 %	  nu    (nModexnTime double) -- Modal time functions.
 %	  nMode (int)                -- Number of modes used.
@@ -144,6 +150,7 @@ if nMode > FemSol.nMode
 	nMode = FemSol.nMode;
 end
 
+mu  = zeros(nMode, 1);
 phi = zeros(nMode, TimeParams.numel);
 eta = zeros(nMode, TimeParams.numel);
 
@@ -154,8 +161,8 @@ t   = TimeParams.sample;
 eps = AlgSys.eps;
 
 for r = 1:nMode
-	mu           = FemSol.mode(:, r)' * AlgSys.M_free * FemSol.mode(:, r);
-	phi(r, :)    = FemSol.mode(:, r)' * loadSample / mu;
+	mu(r)        = FemSol.mode(:, r)' * AlgSys.M_free * FemSol.mode(:, r);
+	phi(r, :)    = FemSol.mode(:, r)' * loadSample / mu(r);
 	wd           = sqrt(1-eps(r)^2) * FemSol.frequencyRad(r);
 	h            = 1/wd .* exp(-eps(r)*wd*t) .* sin(wd*t);
 	nuTransient  = exp(-eps(r)*wd*t) .* (A*cos(wd*t) + B*sin(wd*t));
@@ -164,9 +171,10 @@ for r = 1:nMode
 	eta(r, :)    = nuTransient + nuPermanent;
 end
 
-ModalSup.phi        = phi;
-ModalSup.eta        = eta;
-ModalSup.nMode      = nMode;
+ModalSup.mu    = mu;
+ModalSup.phi   = phi;
+ModalSup.eta   = eta;
+ModalSup.nMode = nMode;
 end
 
 %% 5. Compute the displacements
