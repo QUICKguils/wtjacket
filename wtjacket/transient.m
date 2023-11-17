@@ -51,7 +51,6 @@ ThisLoad = SdivStruct.loadList{lookupLoadLabel};
 DiscreteLoad = ThisLoad.set_discrete_load(AlgSys.nDof_free, TimeParams.sample);
 
 % 4. Compute the modal superposition
-
 ModalSup = modal_superposition(AlgSys, FemSol, TimeParams, DiscreteLoad.sample, nMode);
 
 % 5. Compute the displacements
@@ -82,48 +81,6 @@ TransientSol.Newmark          = NewmarkSol;
 optrets = {AlgSys, TransientSol};
 varargout(1:nargout) = optrets(1:nargout);
 
-end
-
-%% 1. Set the time discretization
-
-function TimeParams = set_time_parameters(timeSample, initialConditions)
-% SET_TIME_PARAMETERS  Set the temporal parameters of the problem.
-
-% Ensure the time vector is in the expected shape.
-timeSample = reshape(timeSample, 1, []);
-
-% TODO: see if start and end fields are used.
-TimeParams.sample = timeSample;
-TimeParams.steps  = [diff(timeSample), timeSample(end)-timeSample(end-1)];
-TimeParams.start  = timeSample(1);
-TimeParams.end    = timeSample(end);
-TimeParams.numel  = numel(timeSample);
-TimeParams.initialConditions = initialConditions;
-end
-
-%% 2. Set the proportional damping parameters
-
-function [C, eps] = set_damping_parameters(eps, w0, AlgSys)
-% SET_DAMPING_MATRIX  Set the damping matrix, assuming a proportional damping.
-%
-% Arguments:
-%	eps (1x2 double)
-%	  Proportional damping ratios of the first two modes.
-%	w0 (1xnMode double)
-%	  Natural frequencies of the asociated conservative system [rad/s].
-%	AlgSys (struct)
-%	  Parameters of the discrete algebraic system.
-% Returns:
-%	C   (NxN double)     -- Proportional damping matrix.
-%	eps (1xNmode double) -- Proportional damping ratios of the first modes.
-%
-% See reference book, p.156.
-
-a = 2             * (w0(1)*eps(1) - w0(2)*eps(2)) / (w0(1)^2 - w0(2)^2);
-b = 2*w0(1)*w0(2) * (w0(1)*eps(2) - w0(2)*eps(1)) / (w0(1)^2 - w0(2)^2);
-
-C   = a*AlgSys.K + b*AlgSys.M;
-eps = 0.5 * (a*w0 + b./w0);
 end
 
 %% 4. Compute the modal superposition
@@ -196,33 +153,4 @@ partialStaticResponse = FemSol.mode(:, 1:ModalSup.nMode) * (ModalSup.phi ./ FemS
 
 ModeAccelSol.q    = ModeDisplSol.q + completeStaticResponse -partialStaticResponse;
 ModeAccelSol.name = 'mode acceleration';
-end
-
-%% 6. Plot the displacements
-
-function plot_displacement(TransientSol, timeSample, lookupNodeLabels, loadDirection, nodeList, nMode)
-% PLOT_DISPLACEMENT  Plot the time evolution of the displacements.
-
-allclose(norm(loadDirection), 1);
-
-figure("WindowStyle", "docked");
-
-nNode = numel(lookupNodeLabels);
-for i = 1:nNode
-	qX = TransientSol.q(nodeList{lookupNodeLabels(i)}.dof(1), :) * loadDirection(1);
-	qY = TransientSol.q(nodeList{lookupNodeLabels(i)}.dof(2), :) * loadDirection(2);
-	qZ = TransientSol.q(nodeList{lookupNodeLabels(i)}.dof(3), :) * loadDirection(3);
-
-	qDir = qX + qY + qZ;
-
-	subplot(nNode, 1, i);
-	plot(timeSample, qDir);
-	xlabel("Time (s)");
-	ylabel("Displacement (dir: [" + num2str(loadDirection, '%.3f  ') + "])");
-	title('Transient response', ...
-		['(node: ', num2str(lookupNodeLabels(i)), ...
-		', method: ', TransientSol.name, ...
-		', order: ', num2str(nMode), ')']);
-	grid;
-end
 end
