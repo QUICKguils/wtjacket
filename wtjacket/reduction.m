@@ -2,23 +2,23 @@ function [frequencyHertz] = reduction(SdivStruct, AlgSys, nMode)
 % TODO: documentation
 % REDUCTION
 
-ndList = SdivStruct.nodeList;
+nodedList = SdivStruct.nodeList;
 % Nodes highlighted in the structure
-redNodesList = [18, 22];
-redDOFsList = [];
+redNodeList = [18, 22];
+redDofList = [];
 
 % optrets = {};
 % varargout(1:nargout) = optrets(1:nargout);
-for k = 1:length(redNodesList)
-	redDOFsList = cat(2, redDOFsList, cat(2, ndList{1, redNodesList(k)}.dof(1:3), ndList{1, redNodesList(k)}.dof(6)));
+for k = 1:length(redNodeList)
+	redDofList = cat(2, redDofList, cat(2, nodedList{1, redNodeList(k)}.dof(1:3), nodedList{1, redNodeList(k)}.dof(6)));
 end
 
-condDOFsList = zeros(1, AlgSys.nDof-length(redDOFsList));
+condDOFsList = zeros(1, AlgSys.nDof-length(redDofList));
 % TODO more elegant solution, this does work tho
 k = 1;
 l = 1;
 while k <= AlgSys.nDof
-	if not(ismember(k, redDOFsList))
+	if not(ismember(k, redDofList))
 		condDOFsList(l) = k;
 		l = l + 1;
 	end
@@ -26,19 +26,19 @@ while k <= AlgSys.nDof
 end
 
 % Guyans-Irons Method - STATIC CONDENSATION
-frequencyHertz = GuyanIronsReduction(AlgSys, nMode, redDOFsList, condDOFsList, redNodesList);
+frequencyHertz = GuyanIronsReduction(AlgSys, nMode, redDofList, condDOFsList);
 
 % Craig-Brampton Method
 % TODO refactor this part into analysis/reduction_analysis
 for m = 1:10
-	frequencyHertz = [frequencyHertz CraigBramptonReduction(AlgSys, nMode, m, redDOFsList, condDOFsList, redNodesList)];
+	frequencyHertz = [frequencyHertz CraigBramptonReduction(AlgSys, nMode, m, redDofList, condDOFsList)];
 end
 % TODO - freq convergence plot
 
 % TODO - time integration
 end
 
-function [frequencyHertz] = GuyanIronsReduction(AlgSys, nMode, redDOFsList, condDOFsList, redNodesList)
+function [frequencyHertz] = GuyanIronsReduction(AlgSys, nMode, redDOFsList, condDOFsList)
 % TODO refactor as suppressed collumns ?
 
 % K submatrices.
@@ -64,7 +64,7 @@ frequencyRad  = sqrt(diag(eigvals));
 frequencyHertz = frequencyRad / (2*pi);
 end
 
-function [frequencyHertz] = CraigBramptonReduction(AlgSys, nMode, m, redDOFsList, condDOFsList, redNodesList)
+function [frequencyHertz] = CraigBramptonReduction(AlgSys, nMode, m, redDOFsList, condDOFsList)
 
 % K submatrices.
 KII = AlgSys.K(condDOFsList, condDOFsList);

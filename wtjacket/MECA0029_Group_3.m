@@ -2,28 +2,31 @@ function MECA0029_Group_3(varargin)
 % MECA0029_Group_3  triggers all the code of the project.
 %
 % Arguments:
-%	sdiv  (int)      -- Number of subsivisions in the bare structure (default: 3).
-%	nMode (int)      -- Number of computed first modes (default: 8).
-%	opts  (1xN char) -- Options (default: 'ps').
-%	  ''  -> No options.
-%	  'p' -> Enable plots creation.
-%	  's' -> Save generated data.
+%	sdiv   (int)      -- Number of subsivisions in the bare structure (default: 3).
+%	nMode  (int)      -- Number of computed first modes (default: 8).
+%	method (1xN char) -- Methods used for the transient response (default: 'dan').
+%	  'd' -> Mode [D]isplacement method.
+%	  'a' -> Mode [A]cceleration method.
+%	  'n' -> [N]ewmark (time integration).
+%	opts   (1xN char) -- Options (default: 'ps').
+%	  'p' -> Enable [P]lots creation.
+%	  's' -> [S]ave generated data.
 
 %% Options setting
 
 % Check number of inputs.
-if numel(varargin) > 3
-	error('At most 3 optional inputs are required');
+if numel(varargin) > 4
+	error('At most 4 optional inputs are required');
 end
 
 % Set default value for optional inputs.
-optargs = {3, 8, 'ps'};
+optargs = {3, 8, 'dan', 'ps'};
 
 % Overwrite default value of optional inputs.
 optargs(1:nargin) = varargin;
 
 % Place optional args in memorable variable names.
-[sdiv, nMode, opts] = optargs{:};
+[sdiv, nMode, method, opts] = optargs{:};
 
 %% Set program initial state
 
@@ -51,10 +54,10 @@ Cst = load_constants();
 [BareStruct, SdivStruct, AlgSys, FemSol] = modeling(Cst, sdiv, nMode, opts);
 
 % 2. Transient response.
-[AlgSys, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts);
+[AlgSys, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, method, opts);
 
 % 3. Reduction methods.
-[frequencyHertz] = reduction(SdivStruct, AlgSys, nMode)
+[frequencyHertz] = reduction(SdivStruct, AlgSys, nMode);
 
 %% Save generated data
 

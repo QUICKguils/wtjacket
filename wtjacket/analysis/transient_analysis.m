@@ -1,75 +1,140 @@
-function transient_analysis()
+function transient_analysis(varargin)
 % TRANSIENT_ANALYSIS  Analyze the results of the transient part.
+%
+% Arguments:
+%	focus (1xN char) -- Analysis to focus on (default: 'lsn').
+%	  'l' -> [L]oad spatial distribution.
+%	  's' -> [S]teady-state response.
+%	  'c' -> [C]onvergence of the mode superposition methods.
+%	  'n' -> [N]ewmark solution.
 
 % TODO:
-% - stem plots of the phi(t)
-% - frf(18, 18)
-% - displ for the peak frequency of frf(18, 18).
-% - frf of newmark's solution, both at the excitation point and at the
-%   rotor location.
+% - better management of sdiv and nMode across functions.
 
+% Set default value for optional inputs.
+optargs = {'lcsn'};
+% Overwrite default value of optional inputs.
+optargs(1:numel(varargin)) = varargin;
+% Place optional args in memorable variable names.
+[focus] = optargs{:};
+
+% TODO: remove that when debugged.
 close all;
 
+% Compute the FEM solution.
 Cst = load_constants();
-sdiv = 3;
-nMode = 8;
-[~, SdivStruct, AlgSys, FemSol] = modeling(Cst, sdiv, nMode, '');
-[AlgSys, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, '');
+[~, SdivStruct, AlgSys, FemSol] = modeling(Cst, 3, 8, '');
 
-analyze_phi(TransientSol);
-% analyse_frf(AlgSys, FemSol, TransientSol.DiscreteLoad, SdivStruct.nodeList, TransientSol.ModalSup.mu);
-analyse_NewmarkSol(SdivStruct, TransientSol)
+% Wrapper for the transient response computations.
+this_transient = @(nMode, method, opts) transient(Cst, SdivStruct, AlgSys, FemSol, nMode, method, opts);
+
+if contains(focus, 'l'); analyze_load_distribution(FemSol, this_transient); end
+if contains(focus, 's'); analyze_steady_state(SdivStruct.nodeList, FemSol, this_transient); end
+if contains(focus, 'c'); analyze_convergence(); end
+if contains(focus, 'n'); analyze_NewmarkSol(SdivStruct.nodeList, this_transient); end
 
 end
 
+%% 1. Analyze the load spatial distribution
 
-function analyze_phi(TransientSol)
-% plot of the phi's abs value.
+function analyze_load_distribution(FemSol, this_transient)
+% ANALYZE_LOAD_DISTRIBUTION  Spatial factor of the M-norm of the displacements.
 %
-% Analyse the modal participation factors.
+% Arguments:
+%	FemSol         (struct) -- Solution of the FEM simulation.
+%	this_transient (handle) -- Compute the desired transient solution.
 
+% Get the solution of the transient problem,
+% for the mode displacement and the mode acceleration methods.
+[~, TransientSol] = this_transient(8, 'da', '');
 
-phiAmplitude = max(TransientSol.ModalSup.phi, [], 2);
+% Spatial factor: related to max. of modal participation factors phi.
+qSpatialNorm = abs(FemSol.mode' * TransientSol.DiscreteLoad.spatial) ./ sqrt(TransientSol.ModalSup.mu);
 
 figure("WindowStyle", "docked");
-stem(phiAmplitude);
+stem(qSpatialNorm);
 set(gca,'yscal','log');
 grid;
 title([ ...
-	"Distribution of modal participation factors (\phi)", ...
+	"Distribution of the ||q||M spatial factors", ...
 	"across the first " + num2str(TransientSol.ModalSup.nMode) + " modes"]);
 xlabel("Associated mode number");
-ylabel("max(\phi)");  % [m²/s² or 1/s²].
+ylabel("Displacement spatial M-norms");
 
 end
 
-% TODO:
-% - make this more flexible, not only (18, 18)
-function analyse_frf(AlgSys, FemSol, DiscreteLoad, nodeList, mu)
-% plot of the frf
-% plot of the transient resp. via newmark for peak frequency.
+%% 2. Analyze the steady-state displacement response
 
-	function frf = build_frf(AlgSys, FemSol, mu, w)
-		frf = zeros(AlgSys.nDof_free);
+function analyze_steady_state(nodeList, FemSol, this_transient)
+% Plot the steady-state displacement amplitude.
+%
+% This function uses the spectral expansion of the admittance matrix to compute
+% the amplitude of the displacement.
+% It thus assumes a harmonic excitation of frequency `w`.
+%
+% Arguments:
+%	nodeList       {1xN Node} -- Cell list of nodes.
+%	FemSol         (struct)   -- Solution of the FEM simulation.
+%	this_transient (handle)   -- Compute the desired transient solution.
+
+% TODO: make this function more flexible, not only (18, 18)
+
+% Get the solution of the transient problem,
+% for the mode acceleration method.
+[AlgSys, TransientSol] = this_transient(8, 'a', '');
+
+% Local aliases, for readability.
+g  = TransientSol.DiscreteLoad.spatial;
+mu = TransientSol.ModalSup.mu;
+
+	function H = build_H(AlgSys, FemSol, mu, wSet)
+		% Build the admittance matrix H, for the given frequencies.
+		%
+		% Argument:
+		%	wSet (1xN double) -- Harmonic excitation frequencies [rad/s].
+		% Return:
+		%	H (nDofFreexnDofFree complex) -- Admittance matrix.
+
+		% Preallocate admittance matrix.
+		H = zeros(AlgSys.nDofFree, AlgSys.nDofFree, numel(wSet));
+		% Local aliases, for readability.
+		x   = FemSol.mode;
+		eps = AlgSys.eps;
+		w0  = FemSol.frequencyRad;
+		% Precompute the mode dyadic products.
+		xTx = zeros(AlgSys.nDofFree, AlgSys.nDofFree, FemSol.nMode);
 		for s = 1:FemSol.nMode
-			frf = frf + FemSol.mode(:, s) * FemSol.mode(:, s)' ./ (mu(s) * (FemSol.frequencyRad(s)^2 - w^2 + 2i*AlgSys.eps(s)*FemSol.frequencyRad(s)*w));
+			xTx(:, :, s) = x(:, s) * x(:, s)';
+		end
+		% Build H through spectral expansion.
+		for w = 1:numel(wSet)
+			for s = 1:FemSol.nMode
+				H(:, :, w) = H(:, :, w) + xTx(:, :, s) ./ (mu(s) * (w0(s)^2 - wSet(w)^2 + 2i*eps(s)*w0(s)*wSet(w)));
+			end
 		end
 	end
 
-frf = @(w) build_frf(AlgSys, FemSol, mu, w);
+	function qSteadyAmpl = compute_steady_state_amplitude(AlgSys, FemSol, mu, wSet)
+		% Returns the amplitude of the steady-state displacement,
+		% for the given harmonic load frequency.
 
-freq = (0:0.01:20)*(2*pi);
-nFreq = numel(freq);
-xSample = zeros(AlgSys.nDof_free, nFreq);
+		HSet = build_H(AlgSys, FemSol, mu, wSet);
+		qSteadyAmpl = zeros(AlgSys.nDofFree, numel(wSet));
+		for w = 1:numel(wSet)
+			qSteadyAmpl(:, w) = abs(HSet(:, :, w) * g);
+		end
+	end
 
-for iFreq = 1:nFreq
-	xSample(:, iFreq) = abs(frf(freq(iFreq)) * DiscreteLoad.spatial);
-end
+freqHz = 0:0.01:20;
+freqRad = freqHz * 2*pi;
+nFreq = numel(freqHz);
 
-x_proj = xSample(nodeList{18}.dof(1), :) * cosd(45) + xSample(nodeList{18}.dof(2), :) * sind(45);
+qSteadyAmpl = compute_steady_state_amplitude(AlgSys, FemSol, mu, freqRad);
+
+x_proj = qSteadyAmpl(nodeList{18}.dof(1), :) * cosd(45) + qSteadyAmpl(nodeList{18}.dof(2), :) * sind(45);
 
 figure("WindowStyle", "docked");
-semilogy(freq/(2*pi), x_proj);
+semilogy(freqHz, x_proj);
 grid;
 xlabel("Frequency (Hz)");
 ylabel("Displacement (node 18, dir of load)");
@@ -79,27 +144,69 @@ title("Amplitude of the steady harmonic load");
 % fréquence d'excitation de 1hz à celle-ci, on voit qu'en effet la
 % réponse transitoire s'amplifie fort au cours du temps, jusqu'à
 % atteindre une valeur fort grande.
+
+xProj = xAmpl(2*pi);
+disp(xProj(nodeList{18}.dof(1), :)*cosd(45) + xProj(nodeList{18}.dof(2), :)*sind(45));
 end
 
+%% 3. Analyze the convergence of the mode superposition methods
+
+function analyze_convergence()
+% ANALYZE_CONVERGENCE  Convergence of the mode superposition methods.
+%
+% Arguments:
+
+end
+
+%% 4. Analyze the Newmark solution
+
+function analyze_NewmarkSol(nodeList, this_transient)
+% ANALYZE_NEWMARK  Analyze the Newmark solution.
+%
+% Arguments:
+%	nodeList       {1xN Node} -- Cell list of nodes.
+%	this_transient (handle)   -- Compute the desired transient solution.
 
 % WARN: the fft strongly depend on the chosen time interval.
 % make sure to integrate enough 1st mode periods.
-function analyse_NewmarkSol(SdivStruct, TransientSol)
-% Plot of the FFT of the Newmark solution.
 
-y = fft(TransientSol.Newmark.q(SdivStruct.nodeList{18}.dof(1), :));
-fs = 1/TransientSol.TimeParams.steps(1);
-% f = (0:length(y)-1)*fs/length(y);
-n = length(TransientSol.Newmark.q(SdivStruct.nodeList{18}.dof(1), :));
-fshift = (-n/2:n/2-1)*(fs/n);
-yshift = fftshift(y);
+% Get the solution of the transient problem,
+% for the Newmark method.
+[~, TransientSol] = this_transient(8, 'n', '');
+
+timeStep      = TransientSol.TimeParams.steps(1);  % WARN: not robust
+loadDirection = TransientSol.DiscreteLoad.direction;
+nMode         = TransientSol.ModalSup.nMode;
+q             = TransientSol.Newmark.q;
+
+lookupNodeLabels = [18, 22];
+
 figure("WindowStyle", "docked");
-semilogy(fshift, abs(yshift)); grid;
-semilogy(fshift(ceil(end/2:end)), abs(yshift(ceil(end/2:end))));
-title("FFT of the transient response");
-xlabel("Frequency (Hz)");
-ylabel("FFT");
-xlim([0, 30]);
-grid;
 
+nNode = numel(lookupNodeLabels);
+for iNode = 1:nNode
+		% 
+		qX = q(nodeList{lookupNodeLabels(iNode)}.dof(1), :) * loadDirection(1);
+		qY = q(nodeList{lookupNodeLabels(iNode)}.dof(2), :) * loadDirection(2);
+		qZ = q(nodeList{lookupNodeLabels(iNode)}.dof(3), :) * loadDirection(3);
+		qDir = qX + qY + qZ;
+		y = fft(qDir);
+		fs = 1/timeStep;
+		% f = (0:length(y)-1)*fs/length(y);
+		n = length(qDir);
+		fshift = (-n/2:n/2-1) * (fs/n);
+		yshift = fftshift(y);
+
+		subplot(nNode, 1, iNode);
+		semilogy(fshift, abs(yshift));
+		grid;
+		semilogy(fshift(ceil(end/2:end)), abs(yshift(ceil(end/2:end))));
+		title('FFT of the Newmark''s transient response', ...
+			['(node: ', num2str(lookupNodeLabels(iNode)), ...
+			', order: ', num2str(nMode), ')']);
+		xlabel("Frequency (Hz)");
+		ylabel("FFT");
+		xlim([0, 30]);
+		grid;
+	end
 end

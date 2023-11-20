@@ -6,8 +6,7 @@ function varargout = modeling(Cst, sdiv, nMode, opts)
 %	sdiv  (int)      -- Number of subdivisions in the bare structure.
 %	nMode (int)      -- Number of first mode computed.
 %	opts  (1xN char) -- Options.
-%	  ''  -> No options.
-%	  'p' -> Enable plots creation.
+%	  'p' -> Enable [P]lots creation.
 % Returns:
 %	BareStruct (struct) -- Bare structure, with fields:
 %	  nodeList {1xN Node}             -- Cell list of nodes.
@@ -27,20 +26,20 @@ function varargout = modeling(Cst, sdiv, nMode, opts)
 %	  nElem    (int)                  -- Number of elements.
 %	  nDof     (int)                  -- Number of DOFs.
 %	AlgSys (struct) -- Parameters of the discrete algebraic system, with fields:
-%	  K_free    (nDofxnDof double) -- Global siffness matrix, without constraints.
-%	  M_free    (nDofxnDof double) -- Global mass     matrix, without constraints.
-%	  K         (NxN double)       -- Global siffness matrix, with    constraints.
-%	  M         (NxN double)       -- Global mass     matrix, with    constraints.
-%	  nDof_free (int)              -- Number of DOFs of the free structure.
-%	  nDof      (int)              -- Number of DOFs of the constrained structure.
-%	  nCstr     (int)              -- Number of constrained DOFs.
-%	  cstrMask  (1xnDof bool)      -- Index on constrained DOFs.
+%	  K_free   (nDofFreexnDofFree double) -- Global siffness matrix, without constraints.
+%	  M_free   (nDofFreexnDofFree double) -- Global mass     matrix, without constraints.
+%	  K        (nDofxnDof double)         -- Global siffness matrix, with    constraints.
+%	  M        (nDofxnDof double)         -- Global mass     matrix, with    constraints.
+%	  nDofFree (int)                      -- Number of DOFs of the free structure.
+%	  nDof     (int)                      -- Number of DOFs of the constrained structure.
+%	  nCstr    (int)                      -- Number of constrained DOFs.
+%	  cstrMask (1xnDofFree bool)          -- Index on constrained DOFs.
 %	FemSol (struct) -- Solution of the FEM simulation, with fields:
-%	  frequencyHertz (1xnMode double)    -- Natural frequencies [Hz].
-%	  frequencyRad   (1xnMode double)    -- Natural frequencies [rad/s].
-%	  mode           (nDofxnMode double) -- Modal displacement vectors.
-%	  nMode          (int)               -- Number of computed first modes.
-%	  massFromRbm    (double)            -- Mass calculated from RBM [kg].
+%	  frequencyHertz (1xnMode double)        -- Natural frequencies [Hz].
+%	  frequencyRad   (1xnMode double)        -- Natural frequencies [rad/s].
+%	  mode           (nDofFreexnMode double) -- Modal displacement vectors.
+%	  nMode          (int)                   -- Number of computed first modes.
+%	  massFromRbm    (double)                -- Mass calculated from RBM [kg].
 
 % Reset class internal states.
 clear Node Elem;
@@ -62,7 +61,7 @@ AlgSys.cstrMask = build_cstr_mask(SdivStruct);
 
 [AlgSys.K, AlgSys.M] = apply_boundary_conditions(AlgSys);
 
-[AlgSys.nDof_free, AlgSys.nDof, AlgSys.nCstr] = get_system_dimensions(AlgSys);
+[AlgSys.nDofFree, AlgSys.nDof, AlgSys.nCstr] = get_system_dimensions(AlgSys);
 
 % 3. Eigenvalue problem solving
 
@@ -200,8 +199,8 @@ function [K_free, M_free] = build_global_matrices(SdivStruct)
 % Argument:
 %	SdivStruct (struct) -- Subdivised structure.
 % Returns:
-%	K_free (nDofxnDof double) -- Global free stiffness matrix.
-%	M_free (nDofxnDof double) -- Global free mass      matrix.
+%	K_free (nDofFreexnDofFree double) -- Global free stiffness matrix.
+%	M_free (nDofFreexnDofFree double) -- Global free mass      matrix.
 
 K_free = zeros(SdivStruct.nDof);
 M_free = zeros(SdivStruct.nDof);
@@ -229,7 +228,7 @@ function cstrMask = build_cstr_mask(SdivStruct)
 % Argument:
 %	SdivStruct (struct) -- Subdivised structure.
 % Return:
-%	cstrMask (1 x nDof bool) -- Index on constrained DOFs.
+%	cstrMask (1xnDofFree bool) -- Index on constrained DOFs.
 
 cstrMask = false(1, SdivStruct.nDof);
 
@@ -254,14 +253,14 @@ K = AlgSys.K_free(~AlgSys.cstrMask, ~AlgSys.cstrMask);
 M = AlgSys.M_free(~AlgSys.cstrMask, ~AlgSys.cstrMask);
 end
 
-function [nDof_free, nDof, nCstr] = get_system_dimensions(AlgSys)
+function [nDofFree, nDof, nCstr] = get_system_dimensions(AlgSys)
 % GET_SYSTEM_DIMENSIONS  Get the dimensions of global algebraic systems.
 
-nDof_free = size(AlgSys.K_free, 1);
-nDof      = size(AlgSys.K, 1);
-nCstr     = sum(AlgSys.cstrMask);
+nDofFree = size(AlgSys.K_free, 1);
+nDof     = size(AlgSys.K, 1);
+nCstr    = sum(AlgSys.cstrMask);
 
-assert(nDof_free == nDof + nCstr, 'Ow shit');
+assert(nDofFree == nDof + nCstr, 'Ow shit');
 end
 
 %% 3. Solve the eigenvalue problem
@@ -278,10 +277,10 @@ function FemSol = solve_eigenvalue_problem(SdivStruct, AlgSys, nMode, solver)
 %	  's' -> Use the eigs solver (better for large sparse matrices).
 % Returns:
 %	FemSol (struct) -- Solution of the FEM simulation, with fields:
-%	  frequencyHertz (1xnMode double)    -- Natural frequencies, in hertz.
-%	  frequencyRad   (1xnMode double)    -- Natural frequencies, in rad/s.
-%	  mode           (nDofxnMode double) -- Modal displacement vectors.
-%	  nMode          (int)               -- Number of computed first modes.
+%	  frequencyHertz (1xnMode double)        -- Natural frequencies, in hertz.
+%	  frequencyRad   (1xnMode double)        -- Natural frequencies, in rad/s.
+%	  mode           (nDofFreexnMode double) -- Modal displacement vectors.
+%	  nMode          (int)                   -- Number of computed first modes.
 
 switch solver
 	case 's'
@@ -396,9 +395,9 @@ function varargout = check_rbm(M_free, nNode, mass)
 % one calculated with this RBM.
 %
 % Arguments:
-%	M_free (nDofxnDof double) -- Global free mass matrix.
-%	nNode  (int)              -- Number of structural nodes.
-%	mass   (double)           -- Mass of the entire structure [kg].
+%	M_free (nDofFreexnDofFree double) -- Global free mass matrix.
+%	nNode  (int)                      -- Number of structural nodes.
+%	mass   (double)                   -- Mass of the entire structure [kg].
 % Return:
 %	massFromRbm (double, optional) -- Mass calculated from RBM [kg].
 

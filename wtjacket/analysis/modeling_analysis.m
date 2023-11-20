@@ -112,7 +112,9 @@ function plot_frequency_convergence(Solution)
 
 % Build the solution name.
 if Solution.name ~= ""
-	Solution.name = " (" + Solution.name + ")";
+	solutionName = " (" + Solution.name + ")";
+else
+	solutionName = " (unknown solution) ";
 end
 
 % Instantiate a figure object.
@@ -129,21 +131,23 @@ grid;
 % Plot the residuals.
 subplot(1, 2, 2);
 % NOTE:
-% this way of defining residuals is taken from the fluid mechanics
-% course, section 3.3.
+% this way of defining residuals is taken
+% from the fluid mechanics course, section 3.3.
 residuals = abs(diff(Solution.freqSet)) ./ abs(Solution.freqSet(2, :) - Solution.freqSet(1, :));
 semilogy(Solution.sdivSet(1:end-1), residuals);
-title("Residuals convergence" + Solution.name);
+title("Residuals convergence" + solutionName);
 xlabel("Number of sub-elements");
 ylabel("Residual");
 grid;
 end
 
 function plot_mass_convergence(Solution)
+% PLOT_MASS_CONVERGENCE  Plot the mass convergence.
+
 % TODO mass convergence analysis
 
-% Mass convergence
 figure("WindowStyle", "docked");
+
 subplot(1, 2, 1);
 plot(Solution.sdivSet, Solution.massSet(:, 1));
 title("RBM Total Mass convergence");
@@ -160,7 +164,8 @@ grid;
 end
 
 function plot_mode_convergence()
-% Compute the relative differences between modes amplitudes
+% PLOT_MODE_CONVERGENCE  Compute the relative differences between modes amplitudes.
+
 mode_diff = zeros(numel(sdiv_serie)-1, BS.nbDOF, SOL.nbMode);
 norm_mode_diff = zeros(numel(sdiv_serie)-1, SOL.nbMode);
 

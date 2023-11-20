@@ -67,9 +67,9 @@ end
 % Extend the unknown vectors to include the constrained DOFs.
 % Anyways, displacements, speeds and accelerations are just null
 % for these constrained DOFs.
-q_free   = zeros(AlgSys.nDof_free, TimeParams.numel);
-qd_free  = zeros(AlgSys.nDof_free, TimeParams.numel);
-qdd_free = zeros(AlgSys.nDof_free, TimeParams.numel);
+q_free   = zeros(AlgSys.nDofFree, TimeParams.numel);
+qd_free  = zeros(AlgSys.nDofFree, TimeParams.numel);
+qdd_free = zeros(AlgSys.nDofFree, TimeParams.numel);
 q_free(~AlgSys.cstrMask, :)   = q;
 qd_free(~AlgSys.cstrMask, :)  = qd;
 qdd_free(~AlgSys.cstrMask, :) = qdd;
