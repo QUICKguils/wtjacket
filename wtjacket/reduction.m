@@ -26,24 +26,19 @@ function [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys
     [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask);
 
     % 1 - Guyans-Irons Method - STATIC CONDENSATION.
-    [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol] = GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs, highlightedNodes);
+    [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs, highlightedNodes);
 
     % 2 - Craig-Brampton Method.
-    [CBReducedSdivStruct, CBReducedAlgSys, CBReducedFemSol] = CraigBramptonReduction(SdivStruct, AlgSys, nMode, m, remainingDOFs, condensedDOFs, highlightedNodes);
-
+    [CBReducedSdivStruct, CBReducedAlgSys, CBReducedFemSol] = R_CraigBramptonReduction(SdivStruct, AlgSys, nMode, m, remainingDOFs, condensedDOFs, highlightedNodes);
+    CBReducedFemSol.frequencyHertz
     % 3 - Time integration.
     timeSample = 0:0.1:10;
     TimeParams = set_time_parameters(timeSample, Cst.INITIAL_CONDITIONS);
 
-    newmark_integrate_reduced_system(Cst, GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, TimeParams, nMode, opts);
-    %newmark_integrate_reduced_system(Cst, CBReducedSdivStruct, CBReducedAlgSys, CBReducedFemSol, TimeParams, nMode, opts);
-
+    ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, CBReducedSdivStruct, CBReducedAlgSys, CBReducedFemSol, TimeParams, nMode, opts);
 end
 
 function ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, ReducedSdivStruct, ReducedAlgSys, ReducedFemSol, TimeParams, nMode, opts)
-    % C matrix.
-    eps = [Cst.DAMPING_RATIO, Cst.DAMPING_RATIO];
-    [ReducedAlgSys.C, eps] = set_damping_parameters(eps, ReducedFemSol.frequencyRad, ReducedAlgSys);
     % Applied load.
     loadAmplitude = Cst.TAIL_MASS * Cst.TAIL_SPEED * Cst.MOMENTUM_TRANSFER / Cst.IMPACT_DURATION;
     loadDirection = [cosd(Cst.FORCE_DIRECTION), -sind(Cst.FORCE_DIRECTION), 0];
@@ -62,7 +57,6 @@ function ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, ReducedSdivSt
         plot_displacement(ReducedNewmarkSol, TimeParams.sample, lookupNodeLabels, ThisLoad.direction, ReducedSdivStruct.nodeList, nMode);
     end
 end
-
 
 function [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask)
     % SORT DOFS Sort structural dofs into remainingDOFs, condensedDOFs vectors
@@ -106,7 +100,7 @@ end
 
 % 1 - Guyan Irons Reduction
 
-function [ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs, highlightedNodes)
+function [ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs, highlightedNodes)
     % TODO refactor as suppressed collumns ?
     ReducedSdivStruct.nodeList{1, 1} = SdivStruct.nodeList{1, 18};
     ReducedSdivStruct.nodeList{1, 2} = SdivStruct.nodeList{1, 22};
@@ -126,14 +120,29 @@ function [ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = GuyanIronsReduction
     MRR = AlgSys.M(remainingDOFs, remainingDOFs);
     MRC = AlgSys.M(remainingDOFs, condensedDOFs);
 
+    % C Submatrices
+    CCC = AlgSys.C(condensedDOFs, condensedDOFs);
+    CCR = AlgSys.C(condensedDOFs, remainingDOFs);
+    CRR = AlgSys.C(remainingDOFs, remainingDOFs);
+    CRC = AlgSys.C(remainingDOFs, condensedDOFs);
+    
+    % Reordering
+    ReducedAlgSys.M = [MRR MRC; MCR MCC];
+    ReducedAlgSys.K = [KRR KRC; KCR KCC];
+    ReducedAlgSys.C = [CRR CRC; CCR CCC];
+    
+    % R Matrix computation
+    R = [eye(max(size(remainingDOFs))); -inv(KCC) * KCR];
+    
     % ReducedAlgSys computation.
-    ReducedAlgSys.M = MRR - MRC / KCC * KCR - KRC / KCC * MCR + KRC / KCC * MCC / KCC * KCR;
-    ReducedAlgSys.K = KRR - KRC / KCC * KCR;
+    ReducedAlgSys.M = R' * ReducedAlgSys.M * R;
+    ReducedAlgSys.K = R' * ReducedAlgSys.K * R;
+    ReducedAlgSys.C = R' * ReducedAlgSys.C * R;
     
     ReducedAlgSys.M_free = ReducedAlgSys.M;
     ReducedAlgSys.K_free = ReducedAlgSys.K;
 
-    ReducedAlgSys.cstrMask = repmat(false, 1, length(remainingDOFs));
+    ReducedAlgSys.cstrMask = false(1, length(remainingDOFs));
 
     ReducedAlgSys.nDof = length(remainingDOFs);
     ReducedAlgSys.nDof_free = ReducedAlgSys.nDof;
@@ -144,7 +153,7 @@ end
 
 % 2 - Craig-Brampton Reduction
 
-function  [ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = CraigBramptonReduction(SdivStruct, AlgSys, nMode, m, remainingDOFs, condensedDOFs, highlightedNodes)
+function  [ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = R_CraigBramptonReduction(SdivStruct, AlgSys, nMode, m, remainingDOFs, condensedDOFs, highlightedNodes)
     ReducedSdivStruct.nodeList{1, 1} = SdivStruct.nodeList{1, 18};
     ReducedSdivStruct.nodeList{1, 2} = SdivStruct.nodeList{1, 22};
     
@@ -156,38 +165,45 @@ function  [ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = CraigBramptonReduc
     KIB = AlgSys.K(condensedDOFs, remainingDOFs);
     KBB = AlgSys.K(remainingDOFs, remainingDOFs);
     KBI = AlgSys.K(remainingDOFs, condensedDOFs);    
+    
     % M Submatrices
     MII = AlgSys.M(condensedDOFs, condensedDOFs);
     MIB = AlgSys.M(condensedDOFs, remainingDOFs);
     MBB = AlgSys.M(remainingDOFs, remainingDOFs);
     MBI = AlgSys.M(remainingDOFs, condensedDOFs);
 
+    % C Submatrices
+    CII = AlgSys.C(condensedDOFs, condensedDOFs);
+    CIB = AlgSys.C(condensedDOFs, remainingDOFs);
+    CBB = AlgSys.C(remainingDOFs, remainingDOFs);
+    CBI = AlgSys.C(remainingDOFs, condensedDOFs);
+
+    % Reordering
+    ReducedAlgSys.M = [MBB MBI; MIB MII];
+    ReducedAlgSys.K = [KBB KBI; KIB KII];
+    ReducedAlgSys.C = [CBB CBI; CIB CII];
+
+    % Solving substructure fixed at the boundary - for m modes, mass-normalized
     SubAlgSys.M = MII;
     SubAlgSys.K = KII;
-    % Solving substructure fixed at the boundary - for m modes, mass-normalized
     SubFemSol = solve_eigenvalue_problem_mass_normalized(SubAlgSys, m);
     
-    % Building reduced K.
-    KBBtilde = KBB - KBI / KII * KIB;
-    K_reduced = [KBBtilde zeros(length(remainingDOFs), m); zeros(m, length(remainingDOFs)) SubFemSol.Omega];
-
-    % Building reduced M.
-    MBBtilde = MBB - (MBI/KII) * MIB + (KBI/KII) * (MII/KII) * KIB;
-    XI = SubFemSol.mode;
-    MBtilde = XI' * (MIB - (MII / KII) * KIB);
-    M_reduced = [MBBtilde MBtilde'; MBtilde eye(m)];
-
+    % R Matrix computation
+    nb = length(remainingDOFs);
+    R = [eye(nb) zeros(nb, m); -inv(KII) * KIB SubFemSol.mode];
+    
     % ReducedAlgSys computation.
-    ReducedAlgSys.M = M_reduced;
-    ReducedAlgSys.K = K_reduced;
+    ReducedAlgSys.M = R' * ReducedAlgSys.M * R;
+    ReducedAlgSys.K = R' * ReducedAlgSys.K * R;
+    ReducedAlgSys.C = R' * ReducedAlgSys.C * R;
 
     ReducedAlgSys.M_free = ReducedAlgSys.M;
     ReducedAlgSys.K_free = ReducedAlgSys.K;
 
-    ReducedAlgSys.cstrMask = [repmat(false, 1, length(remainingDOFs)) repmat(true, 1, m)];
+    ReducedAlgSys.cstrMask = false(1, length(remainingDOFs)+m);
 
-    ReducedAlgSys.nDof = length(remainingDOFs);
-    ReducedAlgSys.nDof_free = ReducedAlgSys.nDof + m;
+    ReducedAlgSys.nDof = length(remainingDOFs) + m;
+    ReducedAlgSys.nDof_free = ReducedAlgSys.nDof;
 
     % Solve the reduced eigenvalue problem.
     ReducedFemSol = solve_eigenvalue_problem_mass_normalized(ReducedAlgSys, nMode);
