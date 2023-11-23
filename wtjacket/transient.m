@@ -53,8 +53,8 @@ eps = [Cst.DAMPING_RATIO, Cst.DAMPING_RATIO];
 % 3. Time-discretized load
 
 % Choose the load to study.
-lookupLoadLabel = 1;
-ThisLoad = SdivStruct.loadList{lookupLoadLabel};
+inspectLoadLabel = 1;
+ThisLoad = SdivStruct.loadList{inspectLoadLabel};
 
 % Create the time-discretized load.
 TransientSol.DiscreteLoad = ThisLoad.set_discrete_load(AlgSys.nDofFree, TransientSol.TimeParams.sample);
@@ -70,8 +70,8 @@ TransientSol = compute_displacement(AlgSys, FemSol, TransientSol, method);
 % 6. Plot the displacements
 
 if contains(opts, 'p')
-	lookupNodeLabels = [18, 22];
-	plot_displacement(TransientSol, lookupNodeLabels, SdivStruct.nodeList, method);
+	inspectNodeLabels = [18, 22];
+	plot_displacement(TransientSol, inspectNodeLabels, SdivStruct.nodeList, method);
 end
 
 % 7. Return the relevant calculated data
@@ -226,14 +226,14 @@ end
 
 %% 6. Plot the displacements
 
-function plot_one_displacement(TransientSol, Method, lookupNodeLabels, nodeList)
+function plot_one_displacement(TransientSol, Method, inspectNodeLabels, nodeList)
 % PLOT_ONE_DISPLACEMENT  Plot the displacements from one given method.
 %
 % Arguments:
-%	TransientSol     (struct)   -- Solutions of the transient problem.
-%	Method           (struct)   -- Solution from one transient method.
-%	lookupNodeLabels (1xN int)  -- Labels list of node to inspect.
-%	nodeList         {1xN Node} -- Cell list of nodes.
+%	TransientSol      (struct)   -- Solutions of the transient problem.
+%	Method            (struct)   -- Solution from one transient method.
+%	inspectNodeLabels (1xN int)  -- Labels list of node to inspect.
+%	nodeList          {1xN Node} -- Cell list of nodes.
 
 timeSample    = TransientSol.TimeParams.sample;
 loadDirection = TransientSol.DiscreteLoad.direction;
@@ -243,11 +243,11 @@ allclose(norm(loadDirection), 1);
 
 figure("WindowStyle", "docked");
 
-nNode = numel(lookupNodeLabels);
+nNode = numel(inspectNodeLabels);
 for iNode = 1:nNode
-	qX = Method.q(nodeList{lookupNodeLabels(iNode)}.dof(1), :) * loadDirection(1);
-	qY = Method.q(nodeList{lookupNodeLabels(iNode)}.dof(2), :) * loadDirection(2);
-	qZ = Method.q(nodeList{lookupNodeLabels(iNode)}.dof(3), :) * loadDirection(3);
+	qX = Method.q(nodeList{inspectNodeLabels(iNode)}.dof(1), :) * loadDirection(1);
+	qY = Method.q(nodeList{inspectNodeLabels(iNode)}.dof(2), :) * loadDirection(2);
+	qZ = Method.q(nodeList{inspectNodeLabels(iNode)}.dof(3), :) * loadDirection(3);
 
 	qDir = qX + qY + qZ;
 
@@ -256,26 +256,26 @@ for iNode = 1:nNode
 	xlabel("Time (s)");
 	ylabel("Displacement (dir: [" + num2str(loadDirection, '%.3f  ') + "])");
 	title('Transient response', ...
-		['(node: ', num2str(lookupNodeLabels(iNode)), ...
+		['(node: ', num2str(inspectNodeLabels(iNode)), ...
 		', method: ', Method.name, ...
 		', order: ', num2str(nMode), ')']);
 	grid;
 end
 end
 
-function plot_displacement(TransientSol, lookupNodeLabels, nodeList, method)
+function plot_displacement(TransientSol, inspectNodeLabels, nodeList, method)
 % PLOT_DISPLACEMENT  Select the methods for which displacement plots are desired.
 %
 % Arguments:
-%	TransientSol     (struct)   -- Solutions of the transient problem.
-%	lookupNodeLabels (1xN int)  -- Labels list of node to inspect.
-%	nodeList         {1xN Node} -- Cell list of nodes.
-%	method           (1xN char) -- Methods used to compute the transient response.
+%	TransientSol      (struct)   -- Solutions of the transient problem.
+%	inspectNodeLabels (1xN int)  -- Labels list of node to inspect.
+%	nodeList          {1xN Node} -- Cell list of nodes.
+%	method            (1xN char) -- Methods used to compute the transient response.
 %	  'd' -> Mode displacement method.
 %	  'a' -> Mode acceleration method.
 %	  'n' -> Newmark (time integration).
 
-plot_for_method = @(Method) plot_one_displacement(TransientSol, Method, lookupNodeLabels, nodeList);
+plot_for_method = @(Method) plot_one_displacement(TransientSol, Method, inspectNodeLabels, nodeList);
 
 if contains(method, 'd'); plot_for_method(TransientSol.ModeDisplacement); end
 if contains(method, 'a'); plot_for_method(TransientSol.ModeAcceleration); end
