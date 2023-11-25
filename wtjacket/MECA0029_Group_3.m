@@ -1,5 +1,5 @@
 function MECA0029_Group_3(varargin)
-% MECA0029_Group_3  triggers all the code of the project.
+% MECA0029_Group_3  Trigger all the code of the project.
 %
 % Arguments:
 %	sdiv   (int)      -- Number of subsivisions in the bare structure (default: 3).
@@ -14,13 +14,13 @@ function MECA0029_Group_3(varargin)
 
 %% Options setting
 
-% Check number of inputs.
-if numel(varargin) > 4
-	error('At most 4 optional inputs are required');
-end
-
 % Set default value for optional inputs.
 optargs = {3, 8, 'dan', 'ps'};
+
+% Check number of inputs.
+if nargin > numel(optargs)
+	error('At most %u optional inputs are required', numel(optargs));
+end
 
 % Overwrite default value of optional inputs.
 optargs(1:nargin) = varargin;

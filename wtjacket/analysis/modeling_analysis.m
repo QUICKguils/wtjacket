@@ -3,7 +3,7 @@ function modeling_analysis(varargin)
 %
 % Arguments:
 %	sdivSet (1 x N int) -- Set of desired number of subdivisions (default: 1:8).
-%	nMode   (int)       -- Number of first mode computed (default: 8).
+%	nMode   (int)       -- Number of first computed modes (default: 8).
 
 % Set default value for optional inputs.
 optargs = {1:8, 8};
