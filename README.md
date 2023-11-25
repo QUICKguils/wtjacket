@@ -51,14 +51,14 @@ For example:
 ```matlab
 % Load the appropriated, previously generated data.
 Cst        = load("res\constants.mat");
-SdivStruct = load("res\subdivisedStructure.mat")
-AlgSys     = load("res\algebraicSystem.mat")
-FemSol     = load("res\femSolution.mat")
+SdivStruct = load("res\subdivisedStructure.mat");
+AlgSys     = load("res\algebraicSystem.mat");
+FemSol     = load("res\femSolution.mat");
 
 % Run the code for the transient part, based on a modal superposition of the
 % first six modes, for the mode acceleration method only, and with plots
 % drawing enabled.
-transient(Cst, SdivStruct, AlgSys, FemSol, 6, 'd', 'p')
+transient(Cst, SdivStruct, AlgSys, FemSol, 6, 'd', 'p');
 ```
 
 ### Executing the analysis files
