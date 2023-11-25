@@ -2,7 +2,7 @@ function transient_analysis(varargin)
 	% TRANSIENT_ANALYSIS  Analyze the results of the transient part.
 	%
 	% Arguments:
-	%	focus (1xN char) -- Analysis to focus on (default: 'lsn').
+	%	focus (1xN char) -- Analysis to focus on (default: 'lscn').
 	%	  'l' -> [L]oad spatial distribution.
 	%	  's' -> [S]teady-state response.
 	%	  'c' -> [C]onvergence of the mode superposition methods.
@@ -10,13 +10,15 @@ function transient_analysis(varargin)
 
 	% TODO:
 	% - better management of sdiv and nMode across functions.
+	% - Maybe a util function for getting the projection of q for a given
+	%   direction and from a given node.
 
 	% Set default value for optional inputs.
-	optargs = {'lcsn', 'da'};
+	optargs = {'lscn'};
 	% Overwrite default value of optional inputs.
 	optargs(1:numel(varargin)) = varargin;
 	% Place optional args in memorable variable names.
-	[focus, cMethod] = optargs{:};
+	focus = optargs{:};
 
 	% TODO: remove that when debugged.
 	close all;
@@ -31,7 +33,7 @@ function transient_analysis(varargin)
 	% Analyze the transient code.
 	if contains(focus, 'l'); analyze_load_distribution(FemSol, this_transient); end
 	if contains(focus, 's'); analyze_steady_state(SdivStruct.nodeList, FemSol, this_transient); end
-	if contains(focus, 'c'); analyze_convergence(); end
+	if contains(focus, 'c'); analyze_convergence(this_transient, SdivStruct.nodeList, 18, 1:8); end
 	if contains(focus, 'n'); analyze_NewmarkSol(SdivStruct.nodeList, this_transient); end
 end
 
@@ -67,7 +69,7 @@ end
 
 %% 2. Analyze the steady-state displacement response
 
-function analyze_steady_state(nodeList, FemSol, this_transient)
+function analyze_steady_state(nodeList, FemSol, this_transient, inspectNodeLabels)
 	% Plot the steady-state displacement amplitude.
 	%
 	% This function uses the spectral expansion of the admittance matrix to compute
@@ -84,6 +86,7 @@ function analyze_steady_state(nodeList, FemSol, this_transient)
 	% Get the modal superposition parameters.
 	[AlgSys, TransientSol] = this_transient(8, '', '');
 	% Local aliases, for readability.
+	loadDirection = TransientSol.DiscreteLoad.direction;
 	g  = TransientSol.DiscreteLoad.spatial;
 	mu = TransientSol.ModalSup.mu;
 
@@ -114,28 +117,36 @@ function analyze_steady_state(nodeList, FemSol, this_transient)
 		end
 	end
 
-	function qSteadyAmpl = compute_ss_amplitude(AlgSys, FemSol, mu, wSet)
+	function qSteadyAmpl = compute_ss_amplitude(AlgSys, FemSol, mu, g, freqRadSet)
 		% COMPUTE_SS_AMPLITUDE  Compute the steady state response amplitude.
 		%
 		% This function computes the amplitude of the steady-state displacement,
 		% for the given harmonic load frequency.
 
-		HSet = build_H(AlgSys, FemSol, mu, wSet);
-		qSteadyAmpl = zeros(AlgSys.nDofFree, numel(wSet));
-		for w = 1:numel(wSet)
+		HSet = build_H(AlgSys, FemSol, mu, freqRadSet);
+		qSteadyAmpl = zeros(AlgSys.nDofFree, numel(freqRadSet));
+		for w = 1:numel(freqRadSet)
 			qSteadyAmpl(:, w) = abs(HSet(:, :, w) * g);
 		end
 	end
 
-	freqHz = 0:0.05:20;
-	freqRad = freqHz * 2*pi;
+	freqHzSet = 0:0.05:20;
+	freqRadSet = freqHzSet * 2*pi;
 
-	qSteadyAmpl = compute_steady_state_amplitude(AlgSys, FemSol, mu, freqRad);
+	qSteadyAmpl = compute_ss_amplitude(H, g, freqRadSet);
+
+	qAmplX = Method.q(nodeList{inspectNodeLabels(iNode)}.dof(1), :) * loadDirection(1);
+	qAmplY = Method.q(nodeList{inspectNodeLabels(iNode)}.dof(2), :) * loadDirection(2);
+	qAmplZ = Method.q(nodeList{inspectNodeLabels(iNode)}.dof(3), :) * loadDirection(3);
+
+	qAmplDir = qAmplX + qAmplY + qAmplZ;
+
 
 	x_proj = qSteadyAmpl(nodeList{18}.dof(1), :) * cosd(45) + qSteadyAmpl(nodeList{18}.dof(2), :) * sind(45);
 
 	figure("WindowStyle", "docked");
-	semilogy(freqHz, x_proj);
+
+	semilogy(freqHzSet, x_proj);
 	grid;
 	xlabel("Frequency (Hz)");
 	ylabel("Displacement (node 18, dir of load)");
@@ -152,40 +163,61 @@ end
 
 %% 3. Analyze the convergence of the mode superposition methods
 
-function analyze_convergence(nModeSet, method)
+function analyze_convergence(this_transient, nodeList, nodeLabel, nModeSet)
 	% ANALYZE_CONVERGENCE  Convergence of the mode superposition methods.
 	%
 	% Arguments:
 
-	if contains(method, 'd'); dConv = this_method_convergence('d', nModeSet); end
-	if contains(method, 'a'); aConv = this_method_convergence('a', nModeSet); end
+	% TODO:
+	% - maybe diffs the solution to a constant ref. For example the newmark sol.
+	% - understant what the hell is going on with these convergences.
 
-	function this_method_convergence(method, nModeSet)
-		% THIS_METHOD_CONVERVENCE  Convergence for the given method.
-		nnMode = numel(nModeSet);
-		for inMode = 1:nnMode
-			compute_norm(method, nModeSet(inMode));
-		end
+	nnMode = numel(nModeSet);
+
+	% Get solution parameters at disposal.
+	[~, TransientSol] = this_transient(0, '', '');
+	TimeParams    = TransientSol.TimeParams;
+	loadDirection = TransientSol.DiscreteLoad.direction;
+
+	qProjDispl = zeros(nnMode, TimeParams.numel);
+	qProjAccel = zeros(nnMode, TimeParams.numel);
+
+	for inMode = 1:nnMode
+		% Get solution for n+1 number of modes.
+		[~,  TransientSol] = this_transient(inMode, 'da', '');
+		qDispl = TransientSol.ModeDisplacement.q;
+		qXDispl = qDispl(nodeList{nodeLabel}.dof(1), :) * loadDirection(1);
+		qYDispl = qDispl(nodeList{nodeLabel}.dof(2), :) * loadDirection(2);
+		qZDispl = qDispl(nodeList{nodeLabel}.dof(3), :) * loadDirection(3);
+		qProjDispl(inMode, :) = qXDispl + qYDispl + qZDispl;
+		qAccel= TransientSol.ModeAcceleration.q;
+		qXAccel = qAccel(nodeList{nodeLabel}.dof(1), :) * loadDirection(1);
+		qYAccel = qAccel(nodeList{nodeLabel}.dof(2), :) * loadDirection(2);
+		qZAccel = qAccel(nodeList{nodeLabel}.dof(3), :) * loadDirection(3);
+		qProjAccel(inMode, :) = qXAccel + qYAccel + qZAccel;
 	end
 
-	function compute_norm(method, nMode)
-		% COMPUTE_NORM  Compute the M-norm of the displacements.
+	% Get the norm of the difference.
+	% TODO: See if a mean is more suited (no TimeParams.numel influence).
+	qDiffDispl = rms(qProjDispl - qProjDispl(end, :), 2);
+	qDiffAccel = rms(qProjAccel - qProjAccel(end, :), 2);
 
-		% Get the solution of the transient problem,
-		% for the mode displacement and the mode acceleration methods.
-		[AlgSys, TransientSol] = this_transient(nMode, method, '');
-		% Local aliases, for readability.
-		M = AlgSys.M_free;
-		q = TransientSol.ModeDisplacement.q;
+	% Plot the residuals.
+	figure("WindowStyle", "docked");
+	subplot(1, 2, 1);
+	plot_residuals(nModeSet, qDiffDispl, "Mode Displacement");
+	subplot(1, 2, 2);
+	plot_residuals(nModeSet, qDiffAccel, "Mode Acceleration");
 
-		% Compute the M-norm.
-		qNorm = sqrt(q' * M * q);
-		disp(qNorm);
+	% TODO: change name
+	function plot_residuals(nModeSet, residuals, methodName)
+		semilogy(nModeSet, residuals);
+		title("Diffs RMS convergence (" + methodName + ")");
+		xlabel("Dimension of the modal basis");
+		ylabel("Diffs");
+		grid;
 	end
 
-	function plot_convergence()
-
-	end
 end
 
 %% 4. Analyze the Newmark solution
@@ -221,6 +253,7 @@ function analyze_NewmarkSol(nodeList, this_transient)
 		qZ = q(nodeList{inspectNodeLabels(iNode)}.dof(3), :) * loadDirection(3);
 		qDir = qX + qY + qZ;
 
+		% TODO: names not evocative.
 		% FFT of the displacement.
 		y = fft(qDir);
 		% Correct the scaling and shifting.

@@ -93,11 +93,8 @@ function TimeParams = set_time_parameters(timeSample, initialConditions)
 % Ensure the time vector is in the expected shape.
 timeSample = reshape(timeSample, 1, []);
 
-% TODO: see if start and end fields are used.
 TimeParams.sample = timeSample;
 TimeParams.steps  = [diff(timeSample), timeSample(end)-timeSample(end-1)];
-TimeParams.start  = timeSample(1);
-TimeParams.end    = timeSample(end);
 TimeParams.numel  = numel(timeSample);
 TimeParams.initialConditions = initialConditions;
 end
@@ -226,8 +223,8 @@ end
 
 %% 6. Plot the displacements
 
-function plot_one_displacement(TransientSol, Method, inspectNodeLabels, nodeList)
-% PLOT_ONE_DISPLACEMENT  Plot the displacements from one given method.
+function plot_this_displacement(TransientSol, Method, inspectNodeLabels, nodeList)
+% PLOT_THIS_DISPLACEMENT  Plot the displacements from the given method.
 %
 % Arguments:
 %	TransientSol      (struct)   -- Solutions of the transient problem.
@@ -275,7 +272,7 @@ function plot_displacement(TransientSol, inspectNodeLabels, nodeList, method)
 %	  'a' -> Mode acceleration method.
 %	  'n' -> Newmark (time integration).
 
-plot_for_method = @(Method) plot_one_displacement(TransientSol, Method, inspectNodeLabels, nodeList);
+plot_for_method = @(Method) plot_this_displacement(TransientSol, Method, inspectNodeLabels, nodeList);
 
 if contains(method, 'd'); plot_for_method(TransientSol.ModeDisplacement); end
 if contains(method, 'a'); plot_for_method(TransientSol.ModeAcceleration); end
