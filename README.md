@@ -53,7 +53,7 @@ For example:
 Cst        = load("res\constants.mat");
 SdivStruct = load("res\subdivisedStructure.mat")
 AlgSys     = load("res\algebraicSystem.mat")
-FemSol     = load("res\FemSolution.mat")
+FemSol     = load("res\femSolution.mat")
 
 % Run the code for the transient part, based on a modal superposition of the
 % first six modes, for the mode acceleration method only, and with plots
