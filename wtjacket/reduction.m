@@ -1,107 +1,191 @@
-function [frequencyHertz] = reduction(SdivStruct, AlgSys, nMode)
-% TODO: documentation
-% REDUCTION
+function [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(Cst, SdivStruct, AlgSys, nMode, m, opts)
+% REDUCTION Study of the reduced models of the wt jacket, from full model.
+%
+% Arguments:
+%	Cst         (struct) -- Constant project quantities.
+%	SdivStruct  (struct) -- Subdivised structure.
+%	AlgSys      (struct) -- Parameters of the discrete algebraic system.
+%	nMode       (int)    -- Number of computed modes.
+%	opts  (1xN char) -- Options.
+%	  ''  -> No options.
+%	  'p' -> Enable plots creation.
+% Returns:
+%	ReducedSdivStruct  (struct) -- Subdivised structure.
+%	CBReducedAlgSys      (struct) -- Parameters of the Craig-Brampton reduced discrete algebraic system.
+%	CBReducedFemSol      (struct) -- Solution of the reduced FEM simulation.
+%	ReducedNewmarkSol (struct) -- Solution of the reduced transient problem using newmark.
 
-nodedList = SdivStruct.nodeList;
-% Nodes highlighted in the structure
-redNodeList = [18, 22];
-redDofList = [];
+% Nodes highlighted in the structure.
+highlightedNodes = [18, 22];
 
-% optrets = {};
-% varargout(1:nargout) = optrets(1:nargout);
-for k = 1:length(redNodeList)
-	redDofList = cat(2, redDofList, cat(2, nodedList{1, redNodeList(k)}.dof(1:3), nodedList{1, redNodeList(k)}.dof(6)));
+% Remaining DOF per nodes.
+%          x    y    z    \th_x \th_y \th_z
+dofMask = [true true true false false true];
+
+% Sort DOFs
+[remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask);
+
+% 1 - Guyans-Irons Method - STATIC CONDENSATION.
+[GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs, highlightedNodes);
+% 2 - Craig-Brampton Method.
+[CBReducedSdivStruct, CBReducedAlgSys, CBReducedFemSol] = R_CraigBramptonReduction(SdivStruct, AlgSys, nMode, m, remainingDOFs, condensedDOFs, highlightedNodes);
+
+% 3 - Time integration.
+ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, CBReducedSdivStruct, CBReducedAlgSys, CBReducedFemSol, nMode, opts);
 end
 
-condDOFsList = zeros(1, AlgSys.nDof-length(redDofList));
-% TODO more elegant solution, this does work tho
+function ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, ReducedSdivStruct, ReducedAlgSys, ReducedFemSol, nMode, opts)
+timeSample = 0:0.1:10;
+TimeParams = set_time_parameters(timeSample, Cst.INITIAL_CONDITIONS);
+    
+% Applied load.
+loadAmplitude = Cst.TAIL_MASS * Cst.TAIL_SPEED * Cst.MOMENTUM_TRANSFER / Cst.IMPACT_DURATION;
+loadDirection = [cosd(Cst.FORCE_DIRECTION), -sind(Cst.FORCE_DIRECTION), 0];
+
+ThisLoad = HarmonicLoad(ReducedSdivStruct.nodeList{1, 1}, loadDirection, loadAmplitude, Cst.LOAD_FREQUENCY_HERTZ);
+
+% Create the time-discretized load.
+DiscreteLoad = ThisLoad.set_discrete_load(ReducedAlgSys.nDof, TimeParams.sample);
+
+% Solve with newmark.
+ReducedNewmarkSol = newmark(ReducedAlgSys, TimeParams, DiscreteLoad.sample);
+
+% Plot displacements at hightlighted nodes.
+if contains(opts, 'p')
+    lookupNodeLabels = [1, 2];
+    plot_displacement(ReducedNewmarkSol, TimeParams.sample, lookupNodeLabels, ThisLoad.direction, ReducedSdivStruct.nodeList, nMode);
+end
+end
+
+function [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask)
+% SORT DOFS Sort structural dofs into remainingDOFs, condensedDOFs vectors
+% Arguments:
+%	SdivStruct          (struct) -- Subdivised structure.
+%	AlgSys              (struct) -- Parameters of the discrete algebraic system.
+%	highlightedNodes    (nNodes x Node) -- Array of Node Index used for sorting.
+%	dofMask             (6 x boolean) -- True for kept dof at nodes (x, y, z, theta_x, theta_y, theta_z)
+% Returns:
+%   remainingDOFs       (nb x int) -- Array of selected remaining dofs of the structure
+%   condensedDOFs       (nDOF-nb x int) -- Array of condensed excluded dofs of the structure
+
+remainingDOFs = [];
+for k=1:length(highlightedNodes)
+    remainingDOFs = [remainingDOFs SdivStruct.nodeList{1, highlightedNodes(k)}.dof(dofMask)];
+end
+
+condensedDOFs = zeros(1, AlgSys.nDof-length(remainingDOFs));
 k = 1;
 l = 1;
-while k <= AlgSys.nDof
-	if not(ismember(k, redDofList))
-		condDOFsList(l) = k;
-		l = l + 1;
-	end
-	k = k + 1;
+while k<=AlgSys.nDof
+    if not(ismember(k, remainingDOFs))
+        condensedDOFs(l) = k;
+        l=l+1;
+    end
+    k=k+1;
+end
 end
 
-% Guyans-Irons Method - STATIC CONDENSATION
-frequencyHertz = GuyanIronsReduction(AlgSys, nMode, redDofList, condDOFsList);
-
-% Craig-Brampton Method
-% TODO refactor this part into analysis/reduction_analysis
-for m = 1:10
-	frequencyHertz = [frequencyHertz CraigBramptonReduction(AlgSys, nMode, m, redDofList, condDOFsList)];
+function ReducedFemSol = solve_eigenvalue_problem_mass_normalized(AlgSys, nMode)
+[Modes, ReducedFemSol.Omega] = eigs(AlgSys.K, AlgSys.M, nMode, 'sm');
+% Mass-normalize modes per definition
+for i = 1:nMode
+    MassNormalizedModes(:, i) = Modes(:, i) / sqrt(Modes(:, i)' * AlgSys.M * Modes(:, i));
 end
-% TODO - freq convergence plot
-
-% TODO - time integration
+ReducedFemSol.mode = MassNormalizedModes;
+ReducedFemSol.nMode = nMode;
+ReducedFemSol.frequencyRad = sqrt(diag(ReducedFemSol.Omega));
+ReducedFemSol.frequencyHertz = ReducedFemSol.frequencyRad/(2*pi);
 end
 
-function [frequencyHertz] = GuyanIronsReduction(AlgSys, nMode, redDOFsList, condDOFsList)
+function [reorderedA, Arr, Arc, Acr, Acc] = submatrixRecomposition(A, r, c)
+% Decomposing A
+Arr = A(r, r);
+Arc = A(r, c);
+Acr = A(c, r);
+Acc = A(c, c);
+
+% Reordering
+reorderedA = [Arr Arc; Acr Acc];
+end
+
+function ReducedAlgSys = ReduceAlgSys(AlgSys, R)
+% Reducing KMC with R
+ReducedAlgSys.K = R' * AlgSys.K * R;
+ReducedAlgSys.M = R' * AlgSys.M * R;
+ReducedAlgSys.C = R' * AlgSys.C * R;
+
+ReducedAlgSys.M_free = ReducedAlgSys.M;
+ReducedAlgSys.K_free = ReducedAlgSys.K;
+end
+
+% 1 - Guyan Irons Reduction
+function [ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs, highlightedNodes)
 % TODO refactor as suppressed collumns ?
+ReducedSdivStruct.nodeList{1, 1} = SdivStruct.nodeList{1, 18};
+ReducedSdivStruct.nodeList{1, 2} = SdivStruct.nodeList{1, 22};
 
-% K submatrices.
-KCC = AlgSys.K(condDOFsList, condDOFsList);
-KCR = AlgSys.K(condDOFsList, redDOFsList);
-KRR = AlgSys.K(redDOFsList, redDOFsList);
-KRC = AlgSys.K(redDOFsList, condDOFsList);
+ReducedSdivStruct.nodeList{1, 1}.dof = [1:4 0 0];
+ReducedSdivStruct.nodeList{1, 2}.dof = [5:8 0 0];
 
-% M Submatrices.
-MCC = AlgSys.M(condDOFsList, condDOFsList);
-MCR = AlgSys.M(condDOFsList, redDOFsList);
-MRR = AlgSys.M(redDOFsList, redDOFsList);
-MRC = AlgSys.M(redDOFsList, condDOFsList);
+K = AlgSys.K;
+M = AlgSys.M;
+C = AlgSys.C;
 
-% Compute reduced AlgSys.
-AlgSys.M = MRR - MRC / KCC * KCR - KRC / KCC * MCR + KRC / KCC * MCC / KCC * KCR;
-AlgSys.K = KRR - KRC / KCC * KCR;
+% Reordering matrices for reduction.
+[AlgSys.K, ~, ~, KCR, KCC] = submatrixRecomposition(AlgSys.K, remainingDOFs, condensedDOFs);
+[AlgSys.M, ~, ~,   ~,   ~] = submatrixRecomposition(AlgSys.M, remainingDOFs, condensedDOFs);
+[AlgSys.C, ~, ~,   ~,   ~] = submatrixRecomposition(AlgSys.C, remainingDOFs, condensedDOFs);
+
+% Reduction matrix R computation.
+R = [eye(length(remainingDOFs)); -inv(KCC) * KCR];
+
+% ReducedAlgSys computation.
+ReducedAlgSys = ReduceAlgSys(AlgSys, R);
+
+% Ensure remaining dofs are free
+ReducedAlgSys.cstrMask = false(1, length(remainingDOFs));
+
+ReducedAlgSys.nDof = length(remainingDOFs);
+ReducedAlgSys.nDof_free = ReducedAlgSys.nDof;
 
 % Solve the eigenvalue problem.
-[~, eigvals] = eigs(AlgSys.K, AlgSys.M, nMode, 'sm');
-% Extract the natural frequencies.
-frequencyRad  = sqrt(diag(eigvals));
-frequencyHertz = frequencyRad / (2*pi);
+ReducedFemSol = solve_eigenvalue_problem_mass_normalized(ReducedAlgSys, nMode);
 end
 
-function [frequencyHertz] = CraigBramptonReduction(AlgSys, nMode, m, redDOFsList, condDOFsList)
+% 2 - Craig-Brampton Reduction
+function  [ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = R_CraigBramptonReduction(SdivStruct, AlgSys, nMode, m, B, I, highlightedNodes)
+ReducedSdivStruct.nodeList{1, 1} = SdivStruct.nodeList{1, 18};
+ReducedSdivStruct.nodeList{1, 2} = SdivStruct.nodeList{1, 22};
 
-% K submatrices.
-KII = AlgSys.K(condDOFsList, condDOFsList);
-KIB = AlgSys.K(condDOFsList, redDOFsList);
-KBB = AlgSys.K(redDOFsList, redDOFsList);
-KBI = AlgSys.K(redDOFsList, condDOFsList);
-% M submatrices.
-MII = AlgSys.M(condDOFsList, condDOFsList);
-MIB = AlgSys.M(condDOFsList, redDOFsList);
-MBB = AlgSys.M(redDOFsList, redDOFsList);
-MBI = AlgSys.M(redDOFsList, condDOFsList);
+ReducedSdivStruct.nodeList{1, 1}.dof = [1:4 0 0];
+ReducedSdivStruct.nodeList{1, 2}.dof = [5:8 0 0];
 
-% Solve substructure fixed at the boundary - for m modes.
-[XI, Omega] = eigs(KII, MII, m, 'sm');
+K = AlgSys.K;
+M = AlgSys.M;
+C = AlgSys.C;
 
-% Mass-normalize modes per definition.
-for i = 1:m
-	XI(:, i) = XI(:, i) / sqrt(XI(:, i)' * MII * XI(:, i));
-end
+% Reordering matrices
+[AlgSys.K, ~, ~, KIB, KII] = submatrixRecomposition(K, B, I);
+[AlgSys.M, ~, ~,   ~, MII] = submatrixRecomposition(M, B, I);
+[AlgSys.C, ~, ~,   ~,   ~] = submatrixRecomposition(C, B, I);
 
-% Build reduced K.
-KBBtilde = KBB - KBI / KII * KIB;
-K_reduced = [KBBtilde zeros(length(redDOFsList), m); zeros(m, length(redDOFsList)) Omega];
+% Solving substructure fixed at the boundary - for m modes, mass-normalized
+SubAlgSys.M = MII;
+SubAlgSys.K = KII;
+SubFemSol = solve_eigenvalue_problem_mass_normalized(SubAlgSys, m);
 
-% Build reduced M.
-MBBtilde = MBB - (MBI/KII) * MIB + (KBI/KII) * (MII/KII) * KIB;
-MBtilde = XI' * (MIB - (MII / KII) * KIB);
-M_reduced = [MBBtilde MBtilde'; MBtilde eye(m)];
+% R Matrix computation
+nb = length(B);
+R = [eye(nb, nb+m); -inv(KII)*KIB SubFemSol.mode];
 
-% Reduced AlgSys forr.
-AlgSys.M = M_reduced;
-AlgSys.K = K_reduced;
+% ReducedAlgSys computation.
+ReducedAlgSys = ReduceAlgSys(AlgSys, R);
+
+ReducedAlgSys.cstrMask = false(1, length(B)+m);
+
+ReducedAlgSys.nDof = length(B)+m;
+ReducedAlgSys.nDof_free = ReducedAlgSys.nDof;
 
 % Solve the reduced eigenvalue problem.
-[~, eigvals] = eigs(AlgSys.K, AlgSys.M, nMode, 'sm');
-
-% Extract the first natural frequencies.
-frequencyRad = sqrt(diag(eigvals));
-frequencyHertz = frequencyRad / (2*pi);
+ReducedFemSol = solve_eigenvalue_problem_mass_normalized(ReducedAlgSys, nMode);
 end
