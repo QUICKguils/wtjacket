@@ -1,13 +1,14 @@
-function varargout = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, method, opts)
+function varargout = transient(Stm, SdivStruct, AlgSys, FemSol, nMode, tSet, method, opts)
 % TRANSIENT  Transient response due to a harmonic excitation.
 %
 % Arguments:
-%	Cst        (struct)   -- Constant project quantities.
-%	SdivStruct (struct)   -- Subdivised structure.
-%	AlgSys     (struct)   -- Parameters of the discrete algebraic system.
-%	FemSol     (struct)   -- Solution of the FEM simulation.
-%	nMode      (int)      -- Number of modes used in the modal superposition.
-%	method     (1xN char) -- Methods used to compute the transient response.
+%	Stm        (struct)     -- Project statement data.
+%	SdivStruct (struct)     -- Subdivised structure.
+%	AlgSys     (struct)     -- Parameters of the discrete algebraic system.
+%	FemSol     (struct)     -- Solution of the FEM simulation.
+%	nMode      (int)        -- Number of modes used in the modal superposition.
+%	tSet       (1xN double) -- Sample used for time evolutions [s].
+%	method     (1xN char)   -- Methods used to compute the transient response.
 %	  'd' -> Mode [D]isplacement method.
 %	  'a' -> Mode [A]cceleration method.
 %	  'n' -> [N]ewmark (time integration).
@@ -38,16 +39,14 @@ function varargout = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, method, o
 
 % 1. Temporal parameters
 
-% TODO:
-% Allow time sample to be defined for each methods.
-% Newmark does not really require such a small time step
-% to give satifying results.
-timeSample = 0:0.01:10;
-TransientSol.TimeParams = set_time_parameters(timeSample, Cst.INITIAL_CONDITIONS);
+% NOTE:
+% Mode superposition methods require a time step
+% not larger than 0.002s, in order to obtain a coherent convergence.
+TransientSol.TimeParams = set_time_parameters(tSet, Stm.INITIAL_CONDITIONS);
 
 % 2. Proportional damping parameters
 
-eps = [Cst.DAMPING_RATIO, Cst.DAMPING_RATIO];
+eps = [Stm.DAMPING_RATIO, Stm.DAMPING_RATIO];
 [AlgSys.C, AlgSys.eps] = set_damping_parameters(eps, FemSol.frequencyRad, AlgSys);
 
 % 3. Time-discretized load
@@ -139,6 +138,7 @@ function ModalSup = modal_superposition(AlgSys, FemSol, TransientSol, nMode)
 %	  mu    (nModex1 double)     -- Generalized masses.
 %	  wd    (nModex1 double)     -- Damped natural frequencies [rad/s].
 %	  phi   (nModexnTime double) -- Modal participation factors.
+%	  h     (nModexnTime double) -- Impulse response.
 %	  nu    (nModexnTime double) -- Modal time functions.
 %	  nMode (int)                -- Number of modes used.
 
@@ -157,15 +157,16 @@ eps        = AlgSys.eps;
 mu  = zeros(nMode, 1);
 wd  = zeros(nMode, 1);
 phi = zeros(nMode, TimeParams.numel);
+h   = zeros(nMode, TimeParams.numel);
 eta = zeros(nMode, TimeParams.numel);
 
 for r = 1:nMode
 	mu(r)        = FemSol.mode(:, r)' * AlgSys.M_free * FemSol.mode(:, r);
 	phi(r, :)    = FemSol.mode(:, r)' * loadSample / mu(r);
 	wd(r)        = sqrt(1-eps(r)^2) * FemSol.frequencyRad(r);
-	h            = 1/wd(r) .* exp(-eps(r)*wd(r)*t) .* sin(wd(r)*t);
+	h(r, :)      = 1/wd(r) .* exp(-eps(r)*wd(r)*t) .* sin(wd(r)*t);
 	nuTransient  = exp(-eps(r)*wd(r)*t) .* (A*cos(wd(r)*t) + B*sin(wd(r)*t));
-	discreteConv = conv(phi(r, :), h);
+	discreteConv = conv(phi(r, :), h(r, :));
 	nuPermanent  = discreteConv(1:TimeParams.numel) .* TimeParams.steps;
 	eta(r, :)    = nuTransient + nuPermanent;
 end
@@ -173,6 +174,7 @@ end
 ModalSup.mu    = mu;
 ModalSup.wd    = wd;
 ModalSup.phi   = phi;
+ModalSup.h     = h;
 ModalSup.eta   = eta;
 ModalSup.nMode = nMode;
 end

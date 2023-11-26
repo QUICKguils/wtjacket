@@ -43,11 +43,11 @@ freqSet = zeros(numel(sdivSet), nMode);
 % modeSet = zeros(numel(sdivSet), BS.nbDOF, nMode);
 % massSet = zeros(numel(sdivSet), 2);
 
-% Constant project quantities.
-Cst = load_constants();
+% Project statement data.
+Stm = load_statement();
 
 for i = 1:numel(sdivSet)
-	[~, ~, ~, FemSol] = modeling(Cst, sdivSet(i), nMode, '');
+	[~, ~, ~, FemSol] = modeling(Stm, sdivSet(i), nMode, '');
 
 	freqSet(i, :) = FemSol.frequencyHertz;
 

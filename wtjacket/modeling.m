@@ -1,8 +1,8 @@
-function varargout = modeling(Cst, sdiv, nMode, opts)
+function varargout = modeling(Stm, sdiv, nMode, opts)
 % MODELING  Model of the wt jacket, using 3D beam elements.
 %
 % Arguments:
-%	Cst   (struct)   -- Constant project quantities.
+%	Stm   (struct)   -- Project statement data.
 %	sdiv  (int)      -- Number of subdivisions in the bare structure.
 %	nMode (int)      -- Number of first mode computed.
 %	opts  (1xN char) -- Options.
@@ -46,11 +46,11 @@ clear Node Elem;
 
 % 1. Subdivised structure
 
-BareStruct = bare_structure(Cst, opts);
+BareStruct = bare_structure(Stm, opts);
 SdivStruct = subdivise_structure(BareStruct, sdiv);
 
 if contains(opts, 'p')
-	plot_subdivised_structure(SdivStruct, Cst.FRAME_HEIGHT(end));
+	plot_subdivised_structure(SdivStruct, Stm.FRAME_HEIGHT(end));
 end
 
 % 2. K and M
@@ -70,7 +70,7 @@ FemSol = solve_eigenvalue_problem(SdivStruct, AlgSys, nMode, 's');
 % 4. Eigenmodes plot
 
 if contains(opts, 'p')
-	plot_vibration_mode(SdivStruct, FemSol, Cst.FRAME_HEIGHT(end));
+	plot_vibration_mode(SdivStruct, FemSol, Stm.FRAME_HEIGHT(end));
 end
 
 % 5. Total mass and sanity checks
