@@ -28,7 +28,7 @@ function transient_analysis(varargin)
 	[~, SdivStruct, AlgSys, FemSol] = modeling(Cst, 3, 8, '');
 
 	% Wrapper for the transient response computations.
-	this_transient = @(nMode, method, opts) transient(Cst, SdivStruct, AlgSys, FemSol, nMode, method, opts);
+	this_transient = @(nMode, method) transient(Cst, SdivStruct, AlgSys, FemSol, nMode, method, '');
 
 	% Analyze the transient code.
 	if contains(focus, 'l'); analyze_load_distribution(FemSol, this_transient); end
@@ -47,7 +47,7 @@ function analyze_load_distribution(FemSol, this_transient)
 	%	this_transient (handle) -- Compute the desired transient solution.
 
 	% Get the modal superposition parameters.
-	[~, TransientSol] = this_transient(8, '', '');
+	[~, TransientSol] = this_transient(8, '');
 	% Local aliases, for readability.
 	g  = TransientSol.DiscreteLoad.spatial;
 	mu = TransientSol.ModalSup.mu;
@@ -84,7 +84,7 @@ function analyze_steady_state(nodeList, FemSol, this_transient, inspectNodeLabel
 	% TODO: make this function more flexible, not only (18, 18)
 
 	% Get the modal superposition parameters.
-	[AlgSys, TransientSol] = this_transient(8, '', '');
+	[AlgSys, TransientSol] = this_transient(8, '');
 	% Local aliases, for readability.
 	loadDirection = TransientSol.DiscreteLoad.direction;
 	g  = TransientSol.DiscreteLoad.spatial;
@@ -161,7 +161,7 @@ function analyze_steady_state(nodeList, FemSol, this_transient, inspectNodeLabel
 	disp(xAt1(nodeList{18}.dof(1), :)*cosd(45) + xAt1(nodeList{18}.dof(2), :)*sind(45));
 end
 
-%% 3. Analyze the convergence of the mode superposition methods
+%% 3. Convergence of the mode superposition methods
 
 function analyze_convergence(this_transient, nodeList, nodeLabel, nModeSet)
 	% ANALYZE_CONVERGENCE  Convergence of the mode superposition methods.
@@ -174,8 +174,8 @@ function analyze_convergence(this_transient, nodeList, nodeLabel, nModeSet)
 
 	nnMode = numel(nModeSet);
 
-	% Get solution parameters at disposal.
-	[~, TransientSol] = this_transient(0, '', '');
+	% Get the transient solution parameters at disposal.
+	[~, TransientSol] = this_transient(0, '');
 	TimeParams    = TransientSol.TimeParams;
 	loadDirection = TransientSol.DiscreteLoad.direction;
 
@@ -183,36 +183,29 @@ function analyze_convergence(this_transient, nodeList, nodeLabel, nModeSet)
 	qProjAccel = zeros(nnMode, TimeParams.numel);
 
 	for inMode = 1:nnMode
-		% Get solution for n+1 number of modes.
-		[~,  TransientSol] = this_transient(inMode, 'da', '');
-		qDispl = TransientSol.ModeDisplacement.q;
-		qXDispl = qDispl(nodeList{nodeLabel}.dof(1), :) * loadDirection(1);
-		qYDispl = qDispl(nodeList{nodeLabel}.dof(2), :) * loadDirection(2);
-		qZDispl = qDispl(nodeList{nodeLabel}.dof(3), :) * loadDirection(3);
-		qProjDispl(inMode, :) = qXDispl + qYDispl + qZDispl;
-		qAccel= TransientSol.ModeAcceleration.q;
-		qXAccel = qAccel(nodeList{nodeLabel}.dof(1), :) * loadDirection(1);
-		qYAccel = qAccel(nodeList{nodeLabel}.dof(2), :) * loadDirection(2);
-		qZAccel = qAccel(nodeList{nodeLabel}.dof(3), :) * loadDirection(3);
-		qProjAccel(inMode, :) = qXAccel + qYAccel + qZAccel;
+		[~,  TransientSol] = this_transient(nModeSet(inMode), 'da');
+		qProjDispl(inMode, :) = project_translation(TransientSol.ModeDisplacement.q, loadDirection, nodeList, nodeLabel);
+		qProjAccel(inMode, :) = project_translation(TransientSol.ModeAcceleration.q, loadDirection, nodeList, nodeLabel);
 	end
 
-	% Get the norm of the difference.
-	% TODO: See if a mean is more suited (no TimeParams.numel influence).
-	qDiffDispl = rms(qProjDispl - qProjDispl(end, :), 2);
-	qDiffAccel = rms(qProjAccel - qProjAccel(end, :), 2);
+	% Reference displacement: Newmark for largest nMode.
+	[~, TransientSol] = this_transient(nModeSet(end), 'n');
+	qProjNewmark = project_translation(TransientSol.Newmark.q, loadDirection, nodeList, nodeLabel);
+	% Quadratic means of the absolute differences with the reference.
+	qDiffDispl = rms(qProjDispl - qProjNewmark, 2);
+	qDiffAccel = rms(qProjAccel - qProjNewmark, 2);
 
-	% Plot the residuals.
+	% Plot the absolute differences.
 	figure("WindowStyle", "docked");
 	subplot(1, 2, 1);
-	plot_residuals(nModeSet, qDiffDispl, "Mode Displacement");
+	plot_residuals(nModeSet, qDiffDispl, "mode displacement");
 	subplot(1, 2, 2);
-	plot_residuals(nModeSet, qDiffAccel, "Mode Acceleration");
+	plot_residuals(nModeSet, qDiffAccel, "mode acceleration");
 
 	% TODO: change name
 	function plot_residuals(nModeSet, residuals, methodName)
 		semilogy(nModeSet, residuals);
-		title("Diffs RMS convergence (" + methodName + ")");
+		title("Diffs RMS convergence", "(" + methodName + ")");
 		xlabel("Dimension of the modal basis");
 		ylabel("Diffs");
 		grid;
@@ -234,7 +227,7 @@ function analyze_NewmarkSol(nodeList, this_transient)
 
 	% Get the solution of the transient problem,
 % for the Newmark method.
-	[~, TransientSol] = this_transient(8, 'n', '');
+	[~, TransientSol] = this_transient(8, 'n');
 	% Local aliases, for readability.
 	timeStep      = TransientSol.TimeParams.steps(1);  % WARN: not robust
 	loadDirection = TransientSol.DiscreteLoad.direction;
@@ -247,18 +240,15 @@ function analyze_NewmarkSol(nodeList, this_transient)
 
 	nNode = numel(inspectNodeLabels);
 	for iNode = 1:nNode
-		% Displacement along the load direction.
-		qX = q(nodeList{inspectNodeLabels(iNode)}.dof(1), :) * loadDirection(1);
-		qY = q(nodeList{inspectNodeLabels(iNode)}.dof(2), :) * loadDirection(2);
-		qZ = q(nodeList{inspectNodeLabels(iNode)}.dof(3), :) * loadDirection(3);
-		qDir = qX + qY + qZ;
+		% Translation along the load direction.
+		qProjected = project_translation(Method.q, loadDirection, nodeList, inspectNodeLabels(iNode));
 
 		% TODO: names not evocative.
 		% FFT of the displacement.
-		y = fft(qDir);
+		y = fft(qProjected);
 		% Correct the scaling and shifting.
 		fs = 1/timeStep;
-		n = length(qDir);
+		n = length(qProjected);
 		fshift = (-n/2:n/2-1) * (fs/n);
 		yshift = fftshift(y);
 

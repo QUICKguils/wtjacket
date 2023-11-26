@@ -242,14 +242,10 @@ figure("WindowStyle", "docked");
 
 nNode = numel(inspectNodeLabels);
 for iNode = 1:nNode
-	qX = Method.q(nodeList{inspectNodeLabels(iNode)}.dof(1), :) * loadDirection(1);
-	qY = Method.q(nodeList{inspectNodeLabels(iNode)}.dof(2), :) * loadDirection(2);
-	qZ = Method.q(nodeList{inspectNodeLabels(iNode)}.dof(3), :) * loadDirection(3);
-
-	qDir = qX + qY + qZ;
+	qProjected = project_translation(Method.q, loadDirection, nodeList, inspectNodeLabels(iNode));
 
 	subplot(nNode, 1, iNode);
-	plot(timeSample, qDir);
+	plot(timeSample, qProjected);
 	xlabel("Time (s)");
 	ylabel("Displacement (dir: [" + num2str(loadDirection, '%.3f  ') + "])");
 	title('Transient response', ...
