@@ -4,16 +4,16 @@ function NewmarkSol = newmark(AlgSys, TimeParams, loadSample)
 % Implement the Newmark's time integration method for linear systems.
 %
 % Arguments:
-%	AlgSys     (struct)            -- Parameters of the discrete algebraic system.
-%	TimeParams (struct)            -- Temporal parameters of the problem.
-%	loadSample (nDofxnTime double) -- Time-discretized load sample [N].
+%	AlgSys     (struct)                -- Parameters of the discrete algebraic system.
+%	TimeParams (struct)                -- Temporal parameters of the problem.
+%	loadSample (nDofFreexnTime double) -- Time-discretized load sample [N].
 % Return:
 %	NewmarkSol (struct)
 %	  Solution of the time integration, with fields:
-%	    q    (nDofxnTime double) -- Displacements [m].
-%	    qd   (nDofxnTime double) -- Velocities [m/s].
-%	    qdd  (nDofxnTime double) -- Accelerations [m/s²].
-%	    name (1xN char)          -- Name of the method.
+%	    q    (nDofFreexnTime double) -- Displacements [m].
+%	    qd   (nDofFreexnTime double) -- Velocities [m/s].
+%	    qdd  (nDofFreexnTime double) -- Accelerations [m/s²].
+%	    name (1xN char)              -- Name of the method.
 %
 % This is a straightforward Matlab implementation of the algorithm
 % explained in the reference book, section 7.2.1. page 522.
