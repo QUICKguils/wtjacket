@@ -176,9 +176,9 @@ M = AlgSys.M;
 C = AlgSys.C;
 
 % Reordering matrices for reduction.
-[AlgSys.K, ~, ~, KCR, KCC] = submatrixRecomposition(AlgSys.K, remainingDOFs, condensedDOFs);
-[AlgSys.M, ~, ~,   ~,   ~] = submatrixRecomposition(AlgSys.M, remainingDOFs, condensedDOFs);
-[AlgSys.C, ~, ~,   ~,   ~] = submatrixRecomposition(AlgSys.C, remainingDOFs, condensedDOFs);
+[AlgSys.K, ~, ~, KCR, KCC] = submatrixRecomposition(K, remainingDOFs, condensedDOFs);
+[AlgSys.M, ~, ~,   ~,   ~] = submatrixRecomposition(M, remainingDOFs, condensedDOFs);
+[AlgSys.C, ~, ~,   ~,   ~] = submatrixRecomposition(C, remainingDOFs, condensedDOFs);
 
 % Reduction matrix R computation.
 R = [eye(length(remainingDOFs)); -inv(KCC) * KCR];
