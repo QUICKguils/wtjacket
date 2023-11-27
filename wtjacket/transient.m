@@ -34,14 +34,13 @@ function varargout = transient(Stm, SdivStruct, AlgSys, FemSol, nMode, tSet, met
 %	  ModeAcceleration (struct) -- Solution from the mode acceleration method.
 %	  Newmark          (struct) -- Solution from the Newmark's time integration.
 
-% TODO:
-% - carry conditional logic on method in this main function.
-
 % 1. Temporal parameters
 
 % NOTE:
-% Mode superposition methods require a time step
-% not larger than 0.002s, in order to obtain a coherent convergence.
+% Mode superposition methods require a time step not larger than 0.002s,
+% in order to obtain a coherent convergence. However, the default time
+% sample `T_SET = 0:0.01:10` gives satisfying results.
+% See: analysis/transient_analysis.m
 TransientSol.TimeParams = set_time_parameters(tSet, Stm.INITIAL_CONDITIONS);
 
 % 2. Proportional damping parameters

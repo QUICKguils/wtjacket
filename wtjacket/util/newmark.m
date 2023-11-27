@@ -19,7 +19,7 @@ function NewmarkSol = newmark(AlgSys, TimeParams, loadSample)
 % explained in the reference book, section 7.2.1. page 522.
 
 % TODO: h is badly implemented.
-% PERF: see if the guess are explicit. If so, don't store them in matrices.
+% PERF: see if the guesses are explicit. If so, don't store them in matrices.
 
 % Constant parameters associated with the quadrature scheme.
 beta = 0.25;
