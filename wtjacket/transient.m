@@ -1,19 +1,21 @@
-function varargout = transient(Stm, SdivStruct, AlgSys, FemSol, nMode, tSet, method, opts)
+function varargout = transient(RunArg, Stm, SdivStruct, AlgSys, FemSol)
 % TRANSIENT  Transient response due to a harmonic excitation.
 %
 % Arguments:
-%	Stm        (struct)     -- Project statement data.
-%	SdivStruct (struct)     -- Subdivised structure.
-%	AlgSys     (struct)     -- Parameters of the discrete algebraic system.
-%	FemSol     (struct)     -- Solution of the FEM simulation.
-%	nMode      (int)        -- Number of modes used in the modal superposition.
-%	tSet       (1xN double) -- Sample used for time evolutions [s].
-%	method     (1xN char)   -- Methods used to compute the transient response.
-%	  'd' -> Mode [D]isplacement method.
-%	  'a' -> Mode [A]cceleration method.
-%	  'n' -> [N]ewmark (time integration).
-%	opts       (1xN char) -- Options.
-%	  'p' -> Enable [P]lots creation.
+%	RunArg (struct) -- Code execution parameters, with fields:
+%	  nMode      (int)        -- Number of modes used in the modal superposition.
+%	  tSet       (1xN double) -- Time sample used for time evolutions.
+%	  method     (1xN char)   -- Methods used to compute the transient response.
+%	    'd' -> Mode [D]isplacement method.
+%	    'a' -> Mode [A]cceleration method.
+%	    'n' -> [N]ewmark (time integration).
+%	  nodeLabels (1xN double) -- Label list of nodes to inspect.
+%	  opts       (1xN char)   -- Output options.
+%	    'p' -> Enable [P]lots creation.
+%	Stm        (struct) -- Project statement data.
+%	SdivStruct (struct) -- Subdivised structure.
+%	AlgSys     (struct) -- Parameters of the discrete algebraic system.
+%	FemSol     (struct) -- Solution of the FEM simulation.
 % Returns:
 %	AlgSys (struct) -- Parameters of the discrete algebraic system, with fields:
 %	  K_free   (nDofFreexnDofFree double) -- Global siffness matrix, without constraints.
@@ -34,13 +36,14 @@ function varargout = transient(Stm, SdivStruct, AlgSys, FemSol, nMode, tSet, met
 %	  ModeAcceleration (struct) -- Solution from the mode acceleration method.
 %	  Newmark          (struct) -- Solution from the Newmark's time integration.
 
+% Unpack relevant execution parameters.
+LocalRunArg = {RunArg.nMode, RunArg.tSet, RunArg.method, RunArg.nodeLabels, RunArg.opts};
+[nMode, tSet, method, nodeLabels, opts] = LocalRunArg{:};
+
 % 1. Temporal parameters
 
 % NOTE:
-% Mode superposition methods require a time step not larger than 0.002s,
-% in order to obtain a coherent convergence. However, the default time
-% sample `T_SET = 0:0.01:10` gives satisfying results.
-% See: analysis/transient_analysis.m
+% See the note about tSet in util/load_defaults.m
 TransientSol.TimeParams = set_time_parameters(tSet, Stm.INITIAL_CONDITIONS);
 
 % 2. Proportional damping parameters
@@ -51,8 +54,8 @@ eps = [Stm.DAMPING_RATIO, Stm.DAMPING_RATIO];
 % 3. Time-discretized load
 
 % Choose the load to study.
-inspectLoadLabel = 1;
-ThisLoad = SdivStruct.loadList{inspectLoadLabel};
+loadLabel = 1;
+ThisLoad = SdivStruct.loadList{loadLabel};
 
 % Create the time-discretized load.
 TransientSol.DiscreteLoad = ThisLoad.set_discrete_load(AlgSys.nDofFree, TransientSol.TimeParams.sample);
@@ -68,8 +71,7 @@ TransientSol = compute_displacement(AlgSys, FemSol, TransientSol, method);
 % 6. Plot the displacements
 
 if contains(opts, 'p')
-	inspectNodeLabels = [18, 22];
-	plot_displacement(TransientSol, inspectNodeLabels, SdivStruct.nodeList, method);
+	plot_displacement(TransientSol, nodeLabels, SdivStruct.nodeList, method);
 end
 
 % 7. Return the relevant calculated data
@@ -224,14 +226,14 @@ end
 
 %% 6. Plot the displacements
 
-function plot_this_displacement(TransientSol, Method, inspectNodeLabels, nodeList)
+function plot_this_displacement(TransientSol, Method, nodeLabels, nodeList)
 % PLOT_THIS_DISPLACEMENT  Plot the displacements from the given method.
 %
 % Arguments:
-%	TransientSol      (struct)   -- Solutions of the transient problem.
-%	Method            (struct)   -- Solution from one transient method.
-%	inspectNodeLabels (1xN int)  -- Labels list of node to inspect.
-%	nodeList          {1xN Node} -- Cell list of nodes.
+%	TransientSol (struct)   -- Solutions of the transient problem.
+%	Method       (struct)   -- Solution from one transient method.
+%	nodeLabels   (1xN int)  -- Label list of nodes to inspect.
+%	nodeList     {1xN Node} -- Cell list of nodes.
 
 timeSample    = TransientSol.TimeParams.sample;
 loadDirection = TransientSol.DiscreteLoad.direction;
@@ -241,35 +243,35 @@ allclose(norm(loadDirection), 1);
 
 figure("WindowStyle", "docked");
 
-nNode = numel(inspectNodeLabels);
+nNode = numel(nodeLabels);
 for iNode = 1:nNode
-	qProjected = project_translation(Method.q, loadDirection, nodeList, inspectNodeLabels(iNode));
+	qProjected = project_translation(Method.q, loadDirection, nodeList, nodeLabels(iNode));
 
 	subplot(nNode, 1, iNode);
 	plot(timeSample, qProjected);
 	xlabel("Time (s)");
 	ylabel("Displacement (dir: [" + num2str(loadDirection, '%.3f  ') + "])");
 	title('Transient response', ...
-		['(node: ', num2str(inspectNodeLabels(iNode)), ...
+		['(node: ', num2str(nodeLabels(iNode)), ...
 		', method: ', Method.name, ...
 		', order: ', num2str(nMode), ')']);
 	grid;
 end
 end
 
-function plot_displacement(TransientSol, inspectNodeLabels, nodeList, method)
+function plot_displacement(TransientSol, nodeLabels, nodeList, method)
 % PLOT_DISPLACEMENT  Select the methods for which displacement plots are desired.
 %
 % Arguments:
-%	TransientSol      (struct)   -- Solutions of the transient problem.
-%	inspectNodeLabels (1xN int)  -- Labels list of node to inspect.
-%	nodeList          {1xN Node} -- Cell list of nodes.
-%	method            (1xN char) -- Methods used to compute the transient response.
-%	  'd' -> Mode displacement method.
-%	  'a' -> Mode acceleration method.
-%	  'n' -> Newmark (time integration).
+%	TransientSol (struct)   -- Solutions of the transient problem.
+%	nodeLabels   (1xN int)  -- Label list of nodes to inspect.
+%	nodeList     {1xN Node} -- Cell list of nodes.
+%	method       (1xN char) -- Methods used to compute the transient response.
+%	  'd' -> Mode [D]isplacement method.
+%	  'a' -> Mode [A]cceleration method.
+%	  'n' -> [N]ewmark (time integration).
 
-plot_for_method = @(Method) plot_this_displacement(TransientSol, Method, inspectNodeLabels, nodeList);
+plot_for_method = @(Method) plot_this_displacement(TransientSol, Method, nodeLabels, nodeList);
 
 if contains(method, 'd'); plot_for_method(TransientSol.ModeDisplacement); end
 if contains(method, 'a'); plot_for_method(TransientSol.ModeAcceleration); end

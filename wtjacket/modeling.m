@@ -1,12 +1,13 @@
-function varargout = modeling(Stm, sdiv, nMode, opts)
+function varargout = modeling(RunArg, Stm)
 % MODELING  Model of the wt jacket, using 3D beam elements.
 %
 % Arguments:
-%	Stm   (struct)   -- Project statement data.
-%	sdiv  (int)      -- Number of subdivisions in the bare structure.
-%	nMode (int)      -- Number of first mode computed.
-%	opts  (1xN char) -- Options.
-%	  'p' -> Enable [P]lots creation.
+%	Stm    (struct) -- Project statement data.
+%	RunArg (struct) -- Code execution parameters, with fields:
+%	  sdiv  (int)      -- Number of subdivisions in the bare structure.
+%	  nMode (int)      -- Number of first mode computed.
+%	  opts  (1xN char) -- Output options.
+%	    'p' -> Enable [P]lots creation.
 % Returns:
 %	BareStruct (struct) -- Bare structure, with fields:
 %	  nodeList {1xN Node}             -- Cell list of nodes.
@@ -43,6 +44,10 @@ function varargout = modeling(Stm, sdiv, nMode, opts)
 
 % Reset class internal states.
 clear Node Elem;
+
+% Unpack relevant execution parameters.
+LocalRunArg = {RunArg.sdiv, RunArg.nMode, RunArg.opts};
+[sdiv, nMode, opts] = LocalRunArg{:};
 
 % 1. Subdivised structure
 

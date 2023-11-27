@@ -1,8 +1,8 @@
-function [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(Cst, SdivStruct, AlgSys, nMode, m, opts)
+function [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(Stm, SdivStruct, AlgSys, nMode, m, opts)
 % REDUCTION Study of the reduced models of the wt jacket, from full model.
 %
 % Arguments:
-%	Cst         (struct)  -- Constant project quantities.
+%	Stm         (struct)  -- Project statement data.
 %	SdivStruct  (struct)  -- Subdivised structure.
 %	AlgSys      (struct)  -- Parameters of the discrete algebraic system.
 %	nMode       (int)     -- Number of computed modes.
@@ -22,7 +22,7 @@ highlightedNodes = [18, 22];
 dofMask = [true true true false false true];
 
 % Sort DOFs.
-[remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, inspectNodeLabels, dofMask);
+[remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask);
 
 % 1 - Guyans-Irons Method - STATIC CONDENSATION.
 [GI_R, GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs, highlightedNodes);
@@ -31,21 +31,21 @@ dofMask = [true true true false false true];
 
 % 3 - Time integration.
 timeSample = 0:0.01:10;
-TimeParams = set_time_parameters(timeSample, Cst.INITIAL_CONDITIONS);
+TimeParams = set_time_parameters(timeSample, Stm.INITIAL_CONDITIONS);
 
 % Applied load.
-loadAmplitude = Cst.TAIL_MASS * Cst.TAIL_SPEED * Cst.MOMENTUM_TRANSFER / Cst.IMPACT_DURATION;
-loadDirection = [cosd(Cst.FORCE_DIRECTION), -sind(Cst.FORCE_DIRECTION), 0];
+loadAmplitude = Stm.TAIL_MASS * Stm.TAIL_SPEED * Stm.MOMENTUM_TRANSFER / Stm.IMPACT_DURATION;
+loadDirection = [cosd(Stm.FORCE_DIRECTION), -sind(Stm.FORCE_DIRECTION), 0];
 
-ThisLoad = HarmonicLoad(CBReducedSdivStruct.nodeList{1, 1}, loadDirection, loadAmplitude, Cst.LOAD_FREQUENCY_HERTZ);
+ThisLoad = HarmonicLoad(CBReducedSdivStruct.nodeList{1, 1}, loadDirection, loadAmplitude, Stm.LOAD_FREQUENCY_HERTZ);
 
 % Create the time-discretized load.
-DiscreteLoad = ThisLoad.set_discrete_load(CBReducedAlgSys.nDof_free, TimeParams.sample);
+DiscreteLoad = ThisLoad.set_discrete_load(CBReducedAlgSys.nDofFree, TimeParams.sample);
 
 % Choose the load to study.
 lookupLoadLabel = 1;
 FullLoad = SdivStruct.loadList{lookupLoadLabel};
-FullDiscreteLoad = FullLoad.set_discrete_load(AlgSys.nDof_free, TimeParams.sample);
+FullDiscreteLoad = FullLoad.set_discrete_load(AlgSys.nDofFree, TimeParams.sample);
 s = FullDiscreteLoad.sample;
 s = s(~AlgSys.cstrMask, :);
 
@@ -60,7 +60,7 @@ DiscreteLoad.node = CBReducedSdivStruct.nodeList{1, 1};
 
 % Reduce applied load
 
-ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, CBReducedSdivStruct, CBReducedAlgSys, TimeParams, DiscreteLoad, ThisLoad, nMode, opts);
+ReducedNewmarkSol = newmark_integrate_reduced_system(Stm, CBReducedSdivStruct, CBReducedAlgSys, TimeParams, DiscreteLoad, ThisLoad, nMode, opts);
 end
 
 function ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, ReducedSdivStruct, ReducedAlgSys, TimeParams, DiscreteLoad, ThisLoad, nMode, opts)
@@ -87,8 +87,8 @@ function [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highligh
 %   condensedDOFs       (nDOF-nb x int) -- Array of condensed excluded dofs of the structure
 
 remainingDOFs = [];
-for k=1:length(inspectNodeLabels)
-	remainingDOFs = [remainingDOFs SdivStruct.nodeList{1, inspectNodeLabels(k)}.dof(dofMask)];
+for k=1:length(highlightedNodes)
+	remainingDOFs = [remainingDOFs SdivStruct.nodeList{1, highlightedNodes(k)}.dof(dofMask)];
 end
 
 condensedDOFs = zeros(1, AlgSys.nDof-length(remainingDOFs));
@@ -184,7 +184,7 @@ ReducedAlgSys = ReduceAlgSys(AlgSys, R);
 ReducedAlgSys.cstrMask = false(1, length(remainingDOFs));
 
 ReducedAlgSys.nDof = length(remainingDOFs);
-ReducedAlgSys.nDof_free = ReducedAlgSys.nDof;
+ReducedAlgSys.nDofFree = ReducedAlgSys.nDof;
 
 % Solve the eigenvalue problem.
 ReducedFemSol = solve_eigenvalue_problem_mass_normalized(ReducedAlgSys, nMode);
@@ -222,7 +222,7 @@ ReducedAlgSys = ReduceAlgSys(AlgSys, R);
 ReducedAlgSys.cstrMask = false(1, length(B)+m);
 
 ReducedAlgSys.nDof = length(B)+m;
-ReducedAlgSys.nDof_free = ReducedAlgSys.nDof;
+ReducedAlgSys.nDofFree = ReducedAlgSys.nDof;
 
 % Solve the reduced eigenvalue problem.
 ReducedFemSol = solve_eigenvalue_problem_mass_normalized(ReducedAlgSys, nMode);

@@ -22,20 +22,27 @@ addpath(genpath(rootDir));
 
 ### Options of the main file
 
-It is possible to launch the main function with custom options. The docstring of
-the main function gives an exhaustive usage explanation. In particular, it is
-possible to decide whether the relevant data that were computed should be
-saved. If yes, a `res/` directory will be created at top level, and will store
-these data in appropriate `.MAT` files.
+The default code execution parameters are stored in the
+`wtjacket/util/load_defaults.m` file.
+It is however possible to launch the main function overriding these default
+values.
+The docstring of the main function gives an exhaustive usage explanation.
+In particular, it is possible to decide whether the relevant data that were
+computed should be saved. If yes, a `res/` directory will be created at top
+level, and will store these data in appropriate `.MAT` files.
 
 For example:
 ```matlab
-% Main function MECA0029_Group_3(), launched with the default arguments:
-% - 3: three subdivisions in the bare structure,
-% - 8: first eight modes computed,
-% - 'dan': methods used to compute the transient response,
-% - 'ps': [P]lot the results, and [S]ave generated data.
-MECA0029_Group_3(3, 8, 'dan', 'ps');
+% Fetch the default code execution parameters.
+RunArg = load_defaults();
+
+% Override the defaults:
+RunArg.sdiv   = 4;    % 4 subdivisions in the bare structure,
+RunArg.method = 'n';  % Only use Newmark to compute the transient response.
+RunARg.opts   = 's';  % Only save the computed data, don't plot them.
+
+% Launch the main function.
+MECA0029_Group_3(RunArg);
 ```
 
 ### Executing the main parts of the project independently
@@ -50,15 +57,20 @@ the corresponding docstring for an exhaustive explanation.
 For example:
 ```matlab
 % Load the appropriated, previously generated data.
-Cst        = load("res\constants.mat");
+Stm        = load("res\statement.mat");
 SdivStruct = load("res\subdivisedStructure.mat");
 AlgSys     = load("res\algebraicSystem.mat");
 FemSol     = load("res\femSolution.mat");
 
+% Fetch and override the default code execution parameters:
+RunArg = load_defaults();
+RunArg.nMode      = 6;         % Number of computed first modes.
+RunARg.opts       = 'p';       % Enable plots creation.
+RunARg.nodeLabels = [14, 21];  % Compute solution for nodes 14 and 21.
+
 % Run the code for the transient part, based on a modal superposition of the
-% first six modes, for the mode acceleration method only, and with plots
-% drawing enabled.
-transient(Cst, SdivStruct, AlgSys, FemSol, 6, 'd', 'p');
+% first six modes, for the nodes 14 and 21, and with plots drawing enabled.
+transient(RunArg, Stm, SdivStruct, AlgSys, FemSol);
 ```
 
 ### Executing the analysis files
@@ -78,7 +90,7 @@ modeling_analysis(1:8, 8);
 ## Project architecture
 
 - `wtjacket/`:
-  - `MECA_0029_group3.m` triggers all the code of the project.
+  - `MECA_0029_Group_3.m` triggers all the code of the project.
   - `modeling.m` implements the first part of the project, namely the model of
     the wind turbine jacket, using 3D beam elements.
   - `transient.m` implements the second part of the project, namely the

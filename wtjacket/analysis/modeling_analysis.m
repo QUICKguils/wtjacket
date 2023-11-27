@@ -43,11 +43,17 @@ freqSet = zeros(numel(sdivSet), nMode);
 % modeSet = zeros(numel(sdivSet), BS.nbDOF, nMode);
 % massSet = zeros(numel(sdivSet), 2);
 
-% Project statement data.
+% project statement data.
 Stm = load_statement();
+% Default code execution parameters.
+RunArg = load_defaults();
+% Overwrite defaults.
+RunArg.nMode = nMode;
+RunArg.opts = '';
 
 for i = 1:numel(sdivSet)
-	[~, ~, ~, FemSol] = modeling(Stm, sdivSet(i), nMode, '');
+	RunArg.sdiv = sdivSet(i);
+	[~, ~, ~, FemSol] = modeling(RunArg, Stm);
 
 	freqSet(i, :) = FemSol.frequencyHertz;
 
