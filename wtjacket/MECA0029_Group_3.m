@@ -54,7 +54,7 @@ Cst = load_constants();
 [AlgSys, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts);
 
 % 3. Reduction methods.
-[ReducedSdivStruct, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(Cst, SdivStruct, AlgSys, nMode, opts);
+[GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(Cst, SdivStruct, AlgSys, nMode, 3, opts)
 
 %% Save generated data
 
