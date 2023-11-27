@@ -23,45 +23,48 @@ highlightedNodes = [18, 22];
 dofMask = [true true true false false true];
 
 % Sort DOFs
-[remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask);
+nClampedDOFs = 24; % TODO improve this
+[remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask, nClampedDOFs);
 
 % 1 - Guyans-Irons Method - STATIC CONDENSATION.
-[GI_R, GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs, highlightedNodes);
+[GI_R, GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs);
+
 % 2 - Craig-Brampton Method.
-[CB_R, CBReducedSdivStruct, CBReducedAlgSys, CBReducedFemSol] = R_CraigBramptonReduction(SdivStruct, AlgSys, nMode, m, remainingDOFs, condensedDOFs, highlightedNodes);
+[CB_R, CBReducedSdivStruct, CBReducedAlgSys, CBReducedFemSol] = R_CraigBramptonReduction(SdivStruct, AlgSys, nMode, m, remainingDOFs, condensedDOFs);
 
 % 3 - Time integration.
 timeSample = 0:0.01:10;
 TimeParams = set_time_parameters(timeSample, Cst.INITIAL_CONDITIONS);
 
-% Applied load.
-loadAmplitude = Cst.TAIL_MASS * Cst.TAIL_SPEED * Cst.MOMENTUM_TRANSFER / Cst.IMPACT_DURATION;
-loadDirection = [cosd(Cst.FORCE_DIRECTION), -sind(Cst.FORCE_DIRECTION), 0];
+% Setup reduced load
+[DiscreteLoad, FullLoad] = reducedLoad(CBReducedSdivStruct, SdivStruct, AlgSys, TimeParams, CB_R, remainingDOFs, condensedDOFs);
 
-ThisLoad = HarmonicLoad(CBReducedSdivStruct.nodeList{1, 1}, loadDirection, loadAmplitude, Cst.LOAD_FREQUENCY_HERTZ);
+% Integrate
+ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, CBReducedSdivStruct, CBReducedAlgSys, TimeParams, DiscreteLoad, FullLoad, nMode, opts);
+end
 
-% Create the time-discretized load.
-DiscreteLoad = ThisLoad.set_discrete_load(CBReducedAlgSys.nDof_free, TimeParams.sample);
-
+function [DiscreteLoad, FullLoad] = reducedLoad(CBReducedSdivStruct, SdivStruct, AlgSys, TimeParams, R, remainingDOFs, condensedDOFs)
 % Choose the load to study.
 lookupLoadLabel = 1;
 FullLoad = SdivStruct.loadList{lookupLoadLabel};
+
 FullDiscreteLoad = FullLoad.set_discrete_load(AlgSys.nDof_free, TimeParams.sample);
 s = FullDiscreteLoad.sample;
+
+% Ignore clamped dofs
 s = s(~AlgSys.cstrMask, :);
 
+% Reorder DOFs
 S = zeros(size(s));
-for t =1:length(timeSample)
+for t =1:length(TimeParams.sample)
     S(:, t) = [s(remainingDOFs, t); s(condensedDOFs, t)];
 end
-for t = 1:length(timeSample)
-    DiscreteLoad.sample(:, t) = CB_R' * S(:, t);
+
+% Reduce discretized applied load
+for t = 1:length(TimeParams.sample)
+    DiscreteLoad.sample(:, t) = R' * S(:, t); % using R matrix from CB
 end
 DiscreteLoad.node = CBReducedSdivStruct.nodeList{1, 1};
-
-% Reduce applied load
-
-ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, CBReducedSdivStruct, CBReducedAlgSys, TimeParams, DiscreteLoad, ThisLoad, nMode, opts);
 end
 
 function ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, ReducedSdivStruct, ReducedAlgSys, TimeParams, DiscreteLoad, ThisLoad, nMode, opts)
@@ -76,7 +79,7 @@ if contains(opts, 'p')
 end
 end
 
-function [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask)
+function [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask, nClampedDOFs)
 % SORT DOFS Sort structural dofs into remainingDOFs, condensedDOFs vectors
 % Arguments:
 %	SdivStruct          (struct) -- Subdivised structure.
@@ -91,6 +94,9 @@ remainingDOFs = [];
 for k=1:length(highlightedNodes)
     remainingDOFs = [remainingDOFs SdivStruct.nodeList{1, highlightedNodes(k)}.dof(dofMask)];
 end
+
+% since clamped dofs
+remainingDOFs = remainingDOFs - 24;
 
 condensedDOFs = zeros(1, AlgSys.nDof-length(remainingDOFs));
 k = 1;
@@ -158,8 +164,7 @@ ReducedAlgSys.K_free = ReducedAlgSys.K;
 end
 
 % 1 - Guyan Irons Reduction
-function [R, ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs, highlightedNodes)
-% TODO refactor as suppressed collumns ?
+function [R, ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs)
 ReducedSdivStruct.nodeList{1, 1} = SdivStruct.nodeList{1, 18};
 ReducedSdivStruct.nodeList{1, 2} = SdivStruct.nodeList{1, 22};
 
@@ -192,7 +197,10 @@ ReducedFemSol = solve_eigenvalue_problem_mass_normalized(ReducedAlgSys, nMode);
 end
 
 % 2 - Craig-Brampton Reduction
-function  [R, ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = R_CraigBramptonReduction(SdivStruct, AlgSys, nMode, m, B, I, highlightedNodes)
+function  [R, ReducedSdivStruct, ReducedAlgSys, ReducedFemSol] = R_CraigBramptonReduction(SdivStruct, AlgSys, nMode, m, B, I)
+% R CRAIG BRAMPTON REDUCTION Reduce the AlgSys using the R matrix reduction, using m submodes
+
+
 ReducedSdivStruct.nodeList{1, 1} = SdivStruct.nodeList{1, 18};
 ReducedSdivStruct.nodeList{1, 2} = SdivStruct.nodeList{1, 22};
 
