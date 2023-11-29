@@ -4,22 +4,22 @@ function NewmarkSol = newmark(AlgSys, TimeParams, loadSample)
 % Implement the Newmark's time integration method for linear systems.
 %
 % Arguments:
-%	AlgSys     (struct)            -- Parameters of the discrete algebraic system.
-%	TimeParams (struct)            -- Temporal parameters of the problem.
-%	loadSample (nDofxnTime double) -- Time-discretized load sample [N].
+%	AlgSys     (struct)                -- Parameters of the discrete algebraic system.
+%	TimeParams (struct)                -- Temporal parameters of the problem.
+%	loadSample (nDofFreexnTime double) -- Time-discretized load sample [N].
 % Return:
 %	NewmarkSol (struct)
 %	  Solution of the time integration, with fields:
-%	    q    (nDofxnTime double) -- Displacements [m].
-%	    qd   (nDofxnTime double) -- Velocities [m/s].
-%	    qdd  (nDofxnTime double) -- Accelerations [m/s²].
-%	    name (1xN char)          -- Name of the method.
+%	    q    (nDofFreexnTime double) -- Displacements [m].
+%	    qd   (nDofFreexnTime double) -- Velocities [m/s].
+%	    qdd  (nDofFreexnTime double) -- Accelerations [m/s²].
+%	    name (1xN char)              -- Name of the method.
 %
 % This is a straightforward Matlab implementation of the algorithm
 % explained in the reference book, section 7.2.1. page 522.
 
 % TODO: h is badly implemented.
-% PERF: see if the guess are explicit. If so, don't store them in matrices.
+% PERF: see if the guesses are explicit. If so, don't store them in matrices.
 
 % Constant parameters associated with the quadrature scheme.
 beta = 0.25;
@@ -67,9 +67,9 @@ end
 % Extend the unknown vectors to include the constrained DOFs.
 % Anyways, displacements, speeds and accelerations are just null
 % for these constrained DOFs.
-q_free   = zeros(AlgSys.nDof_free, TimeParams.numel);
-qd_free  = zeros(AlgSys.nDof_free, TimeParams.numel);
-qdd_free = zeros(AlgSys.nDof_free, TimeParams.numel);
+q_free   = zeros(AlgSys.nDofFree, TimeParams.numel);
+qd_free  = zeros(AlgSys.nDofFree, TimeParams.numel);
+qdd_free = zeros(AlgSys.nDofFree, TimeParams.numel);
 q_free(~AlgSys.cstrMask, :)   = q;
 qd_free(~AlgSys.cstrMask, :)  = qd;
 qdd_free(~AlgSys.cstrMask, :) = qdd;

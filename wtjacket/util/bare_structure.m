@@ -1,8 +1,8 @@
-function BareStruct = bare_structure(Cst, opts)
+function BareStruct = bare_structure(Stm, opts)
 % BARE_STRUCTURE  Definition of the wind turbine jacket structure.
 %
 % Argument:
-%	Cst  (struct)   -- Constant project quantities.
+%	Stm  (struct)   -- Project statement data.
 %	opts (1xN char) -- Options.
 %	  ''  -> No options.
 %	  'p' -> Enable plots creation.
@@ -33,24 +33,24 @@ function BareStruct = bare_structure(Cst, opts)
 			cstrList = repmat("free", 1, 4);
 		end
 
-		shift = tand(Cst.LEG_ANGLE) * h;
+		shift = tand(Stm.LEG_ANGLE) * h;
 		frame = {
 			Node([               shift,                shift,  h], cstrList(1));
-			Node([Cst.BASE_WIDTH-shift,                shift,  h], cstrList(2));
-			Node([Cst.BASE_WIDTH-shift, Cst.BASE_WIDTH-shift,  h], cstrList(3));
-			Node([               shift, Cst.BASE_WIDTH-shift,  h], cstrList(4))};
+			Node([Stm.BASE_WIDTH-shift,                shift,  h], cstrList(2));
+			Node([Stm.BASE_WIDTH-shift, Stm.BASE_WIDTH-shift,  h], cstrList(3));
+			Node([               shift, Stm.BASE_WIDTH-shift,  h], cstrList(4))};
 	end
 
 nodeList = [
 	% The four horizontal frames.
-	elevate(Cst.FRAME_HEIGHT(1), repmat("clamped", 1, 4));  % The base is clamped.
-	elevate(Cst.FRAME_HEIGHT(2));
-	elevate(Cst.FRAME_HEIGHT(3));
-	elevate(Cst.FRAME_HEIGHT(4));
-	elevate(Cst.FRAME_HEIGHT(5));
+	elevate(Stm.FRAME_HEIGHT(1), repmat("clamped", 1, 4));  % The base is clamped.
+	elevate(Stm.FRAME_HEIGHT(2));
+	elevate(Stm.FRAME_HEIGHT(3));
+	elevate(Stm.FRAME_HEIGHT(4));
+	elevate(Stm.FRAME_HEIGHT(5));
 	% The two nodes to attach the nacelle.
-	{Node([Cst.BASE_WIDTH/2, Cst.BASE_WIDTH/2, Cst.FRAME_HEIGHT(end)])};
-	{Node([Cst.BASE_WIDTH/2, Cst.BASE_WIDTH/2, Cst.NACELLE_HEIGHT   ])}]';
+	{Node([Stm.BASE_WIDTH/2, Stm.BASE_WIDTH/2, Stm.FRAME_HEIGHT(end)])};
+	{Node([Stm.BASE_WIDTH/2, Stm.BASE_WIDTH/2, Stm.NACELLE_HEIGHT   ])}]';
 
 %% Elements
 
@@ -126,10 +126,10 @@ cmList = {ConcentratedMass(nodeList{22})};
 %% Loads
 % Only the assigned load, for the transient part.
 
-loadAmplitude = Cst.TAIL_MASS * Cst.TAIL_SPEED * Cst.MOMENTUM_TRANSFER / Cst.IMPACT_DURATION;
-loadDirection = [cosd(Cst.FORCE_DIRECTION), -sind(Cst.FORCE_DIRECTION), 0];
+loadAmplitude = Stm.TAIL_MASS * Stm.TAIL_SPEED * Stm.MOMENTUM_TRANSFER / Stm.IMPACT_DURATION;
+loadDirection = [cosd(Stm.FORCE_DIRECTION), -sind(Stm.FORCE_DIRECTION), 0];
 
-loadList = {HarmonicLoad(nodeList{18}, loadDirection, loadAmplitude, Cst.LOAD_FREQUENCY_HERTZ)};
+loadList = {HarmonicLoad(nodeList{18}, loadDirection, loadAmplitude, Stm.LOAD_FREQUENCY_HERTZ)};
 
 %% Total mass
 

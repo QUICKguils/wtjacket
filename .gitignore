@@ -9,3 +9,6 @@ draft.m
 
 # Don't track changes for the result files
 res/
+
+# Generated .tex files from matlab2tikz
+*.tex

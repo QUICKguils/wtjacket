@@ -17,11 +17,11 @@ classdef Load
 			end
 		end
 
-		function DiscreteLoad = set_discrete_load(load, nDof, timeSample)
+		function DiscreteLoad = set_discrete_load(load, nDofFree, timeSample)
 			% SET_DISCRETE_LOAD  Create a sample of time-discretized load.
 			%
 			% Arguments:
-			%	nDof       (double)         -- Number of structural DOFs.
+			%	nDofFree  (int)             -- Number of DOFs of the free structure.
 			%	timeSample (1xnTime double) -- Time sample [s].
 			% Return:
 			%	DiscreteLoad (struct) -- time-discretized load, with fields:
@@ -39,7 +39,7 @@ classdef Load
 			load_Y = @(t) load.timeEvolution(t) * load.direction(2);
 			load_Z = @(t) load.timeEvolution(t) * load.direction(3);
 
-			DiscreteLoad.sample = zeros(nDof, numel(timeSample));
+			DiscreteLoad.sample = zeros(nDofFree, numel(timeSample));
 			DiscreteLoad.sample(load.node.dof(1), :) = load_X(timeSample);
 			DiscreteLoad.sample(load.node.dof(2), :) = load_Y(timeSample);
 			DiscreteLoad.sample(load.node.dof(3), :) = load_Z(timeSample);

@@ -93,7 +93,6 @@ classdef Elem
 
 		function M_el = get.M_el(elem)
 			% Pre-terms computation for stiffness matrix.
-			% TODO: make sure of m(1) and m(2).
 			m = [
 				(elem.thickness*(elem.diameter-elem.thickness)) / 3, ... % m(1)
 				(elem.thickness*(elem.diameter-elem.thickness)) / 6, ... % m(2)

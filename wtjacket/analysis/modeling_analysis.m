@@ -3,7 +3,7 @@ function modeling_analysis(varargin)
 %
 % Arguments:
 %	sdivSet (1 x N int) -- Set of desired number of subdivisions (default: 1:8).
-%	nMode   (int)       -- Number of first mode computed (default: 8).
+%	nMode   (int)       -- Number of first computed modes (default: 8).
 
 % Set default value for optional inputs.
 optargs = {1:8, 8};
@@ -43,11 +43,17 @@ freqSet = zeros(numel(sdivSet), nMode);
 % modeSet = zeros(numel(sdivSet), BS.nbDOF, nMode);
 % massSet = zeros(numel(sdivSet), 2);
 
-% Constant project quantities.
-Cst = load_constants();
+% project statement data.
+Stm = load_statement();
+% Default code execution parameters.
+RunArg = load_defaults();
+% Overwrite defaults.
+RunArg.nMode = nMode;
+RunArg.opts = '';
 
 for i = 1:numel(sdivSet)
-	[~, ~, ~, FemSol] = modeling(Cst, sdivSet(i), nMode, '');
+	RunArg.sdiv = sdivSet(i);
+	[~, ~, ~, FemSol] = modeling(RunArg, Stm);
 
 	freqSet(i, :) = FemSol.frequencyHertz;
 
@@ -100,11 +106,54 @@ Solution.nMode   = nMode;
 Solution.name    = 'NX';
 end
 
+function plot_frequency_convergence(Solution)
+% PLOT_FREQUENCY_CONVERGENCE  Generate convergence graphs for the frequencies.
+%
+% Arguments:
+%	Solution (struct) -- Set of solution, with fields:
+%	  nMode   (int)        -- Number of first mode computed.
+%	  sdivSet (1xN int)    -- Set of number of subdivisions.
+%	  freqSet (1xN double) -- Set of associated frequencies.
+%	  name    (char)       -- Name of the solution.
+
+% Build the solution name.
+if Solution.name ~= ""
+	solutionName = " (" + Solution.name + ")";
+else
+	solutionName = " (unknown solution) ";
+end
+
+% Instantiate a figure object.
+figure("WindowStyle", "docked");
+
+% Plot the frequencies.
+subplot(1, 2, 1);
+plot(Solution.sdivSet, Solution.freqSet);
+title("Frequencies convergence" + Solution.name);
+xlabel("Number of sub-elements");
+ylabel("Natural frequency (Hz)");
+grid;
+
+% Plot the residuals.
+subplot(1, 2, 2);
+% NOTE:
+% this way of defining residuals is taken
+% from the fluid mechanics course, section 3.3.
+residuals = abs(diff(Solution.freqSet)) ./ abs(Solution.freqSet(2, :) - Solution.freqSet(1, :));
+semilogy(Solution.sdivSet(1:end-1), residuals);
+title("Residuals convergence" + solutionName);
+xlabel("Number of sub-elements");
+ylabel("Residual");
+grid;
+end
+
 function plot_mass_convergence(Solution)
+% PLOT_MASS_CONVERGENCE  Plot the mass convergence.
+
 % TODO mass convergence analysis
 
-% Mass convergence
 figure("WindowStyle", "docked");
+
 subplot(1, 2, 1);
 plot(Solution.sdivSet, Solution.massSet(:, 1));
 title("RBM Total Mass convergence");
@@ -121,7 +170,8 @@ grid;
 end
 
 function plot_mode_convergence()
-% Compute the relative differences between modes amplitudes
+% PLOT_MODE_CONVERGENCE  Compute the relative differences between modes amplitudes.
+
 mode_diff = zeros(numel(sdiv_serie)-1, BS.nbDOF, SOL.nbMode);
 norm_mode_diff = zeros(numel(sdiv_serie)-1, SOL.nbMode);
 

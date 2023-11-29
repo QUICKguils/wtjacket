@@ -1,14 +1,13 @@
-function [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(Cst, SdivStruct, AlgSys, nMode, m, opts)
+function [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(Stm, SdivStruct, AlgSys, nMode, m, opts)
 % REDUCTION Study of the reduced models of the wt jacket, from full model.
 %
 % Arguments:
-%	Cst         (struct) -- Constant project quantities.
-%	SdivStruct  (struct) -- Subdivised structure.
-%	AlgSys      (struct) -- Parameters of the discrete algebraic system.
-%	nMode       (int)    -- Number of computed modes.
-%	opts  (1xN char) -- Options.
-%	  ''  -> No options.
-%	  'p' -> Enable plots creation.
+%	Stm         (struct)  -- Project statement data.
+%	SdivStruct  (struct)  -- Subdivised structure.
+%	AlgSys      (struct)  -- Parameters of the discrete algebraic system.
+%	nMode       (int)     -- Number of computed modes.
+%	opts       (1xN char) -- Options.
+%	  'p' -> Enable [P]lots creation.
 % Returns:
 %	ReducedSdivStruct  (struct) -- Subdivised structure.
 %	CBReducedAlgSys      (struct) -- Parameters of the Craig-Brampton reduced discrete algebraic system.
@@ -24,7 +23,7 @@ dofMask = [true true true false false true];
 
 % Sort DOFs
 nClampedDOFs = 24; % TODO improve this
-[remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask, nClampedDOFs);
+
 
 % 1 - Guyans-Irons Method - STATIC CONDENSATION.
 [GI_R, GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs);
@@ -34,7 +33,7 @@ nClampedDOFs = 24; % TODO improve this
 
 % 3 - Time integration.
 timeSample = 0:0.01:10;
-TimeParams = set_time_parameters(timeSample, Cst.INITIAL_CONDITIONS);
+TimeParams = set_time_parameters(timeSample, Stm.INITIAL_CONDITIONS);
 
 % Setup reduced load
 [DiscreteLoad, FullLoad] = reducedLoad(CBReducedSdivStruct, SdivStruct, AlgSys, TimeParams, CB_R, remainingDOFs, condensedDOFs);
@@ -47,7 +46,6 @@ function [DiscreteLoad, FullLoad] = reducedLoad(CBReducedSdivStruct, SdivStruct,
 % Choose the load to study.
 lookupLoadLabel = 1;
 FullLoad = SdivStruct.loadList{lookupLoadLabel};
-
 FullDiscreteLoad = FullLoad.set_discrete_load(AlgSys.nDof_free, TimeParams.sample);
 s = FullDiscreteLoad.sample;
 
@@ -65,6 +63,10 @@ for t = 1:length(TimeParams.sample)
     DiscreteLoad.sample(:, t) = R' * S(:, t); % using R matrix from CB
 end
 DiscreteLoad.node = CBReducedSdivStruct.nodeList{1, 1};
+
+% Reduce applied load
+
+ReducedNewmarkSol = newmark_integrate_reduced_system(Stm, CBReducedSdivStruct, CBReducedAlgSys, TimeParams, DiscreteLoad, ThisLoad, nMode, opts);
 end
 
 function ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, ReducedSdivStruct, ReducedAlgSys, TimeParams, DiscreteLoad, ThisLoad, nMode, opts)
@@ -92,7 +94,7 @@ function [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highligh
 
 remainingDOFs = [];
 for k=1:length(highlightedNodes)
-    remainingDOFs = [remainingDOFs SdivStruct.nodeList{1, highlightedNodes(k)}.dof(dofMask)];
+	remainingDOFs = [remainingDOFs SdivStruct.nodeList{1, highlightedNodes(k)}.dof(dofMask)];
 end
 
 % since clamped dofs
@@ -102,11 +104,11 @@ condensedDOFs = zeros(1, AlgSys.nDof-length(remainingDOFs));
 k = 1;
 l = 1;
 while k<=AlgSys.nDof
-    if not(ismember(k, remainingDOFs))
-        condensedDOFs(l) = k;
-        l=l+1;
-    end
-    k=k+1;
+	if not(ismember(k, remainingDOFs))
+		condensedDOFs(l) = k;
+		l=l+1;
+	end
+	k=k+1;
 end
 end
 
@@ -121,7 +123,7 @@ function ReducedFemSol = solve_eigenvalue_problem_mass_normalized(AlgSys, nMode)
 [Modes, ReducedFemSol.Omega] = eigs(AlgSys.K, AlgSys.M, nMode, 'sm');
 % Mass-normalize modes per definition
 for i = 1:nMode
-    MassNormalizedModes(:, i) = Modes(:, i) / sqrt(Modes(:, i)' * AlgSys.M * Modes(:, i));
+	MassNormalizedModes(:, i) = Modes(:, i) / sqrt(Modes(:, i)' * AlgSys.M * Modes(:, i));
 end
 ReducedFemSol.mode = MassNormalizedModes;
 ReducedFemSol.nMode = nMode;
@@ -190,7 +192,7 @@ ReducedAlgSys = ReduceAlgSys(AlgSys, R);
 ReducedAlgSys.cstrMask = false(1, length(remainingDOFs));
 
 ReducedAlgSys.nDof = length(remainingDOFs);
-ReducedAlgSys.nDof_free = ReducedAlgSys.nDof;
+ReducedAlgSys.nDofFree = ReducedAlgSys.nDof;
 
 % Solve the eigenvalue problem.
 ReducedFemSol = solve_eigenvalue_problem_mass_normalized(ReducedAlgSys, nMode);
@@ -231,7 +233,7 @@ ReducedAlgSys = ReduceAlgSys(AlgSys, R);
 ReducedAlgSys.cstrMask = false(1, length(B)+m);
 
 ReducedAlgSys.nDof = length(B)+m;
-ReducedAlgSys.nDof_free = ReducedAlgSys.nDof;
+ReducedAlgSys.nDofFree = ReducedAlgSys.nDof;
 
 % Solve the reduced eigenvalue problem.
 ReducedFemSol = solve_eigenvalue_problem_mass_normalized(ReducedAlgSys, nMode);
