@@ -54,7 +54,7 @@ Cst = load_constants();
 [AlgSys, TransientSol] = transient(Cst, SdivStruct, AlgSys, FemSol, nMode, opts);
 
 % 3. Reduction methods.
-[GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(Cst, SdivStruct, AlgSys, nMode, 3, opts)
+[GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(Cst, SdivStruct, AlgSys, nMode, 3, opts);
 
 %% Save generated data
 
@@ -65,6 +65,9 @@ if contains(opts, 's')
 	save(fullfile(resDirectory, "algebraicSystem.mat"),     "-struct", "AlgSys");
 	save(fullfile(resDirectory, "FemSolution.mat"),         "-struct", "FemSol");
 	save(fullfile(resDirectory, "transientSolution.mat"),   "-struct", "TransientSol");
+	save(fullfile(resDirectory, "GIReducedFemSol.mat"),		"-struct", "GIReducedFemSol");
+	save(fullfile(resDirectory, "CBReducedFemSol.mat"),     "-struct", "CBReducedFemSol");
+	save(fullfile(resDirectory, "ReducedNewmarkSol.mat"),   "-struct", "ReducedNewmarkSol");
 end
 
 end
