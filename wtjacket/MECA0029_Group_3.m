@@ -65,7 +65,7 @@ Stm = load_statement();
 [AlgSys, TransientSol] = transient(RunArg, Stm, SdivStruct, AlgSys, FemSol);
 
 % 3. Reduction methods.
-[GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(Cst, SdivStruct, AlgSys, nMode, 3, opts);
+[GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(RunArg, Stm, SdivStruct, AlgSys, 3);
 
 %% Save generated data
 
