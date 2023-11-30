@@ -1,4 +1,4 @@
-function reduction_analysis(Stm, SdivStruct, AlgSys, FemSol)
+function reduction_analysis(Stm, SdivStruct, AlgSys, FemSol, NewmarkSol, ReducedNewmarkSol)
 % REDUCTION_ANALYSIS  Analyze the results of the reduction part.
 
 % Packing relevant execution parameters.
@@ -18,7 +18,7 @@ freq_array = [GIReducedFemSol.frequencyHertz];
 
 
 % non-exhaustive reduced system study
-m_arr = 1:50;
+m_arr = 1:25;
 n_m = length(m_arr)
 t_CB = zeros(1, n_m);
 
@@ -59,4 +59,46 @@ xlabel("Number of sub-eigenmodes taken for R matrix computation");
 ylabel("Computation time (ms)");
 grid;
 
+% plot displacements : approx wrt. exact 
+figure("WindowStyle", "docked");
+
+ThisLoad = SdivStruct.loadList{1};
+loadDirection = ThisLoad.direction;
+
+[GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(RunArg, Stm, SdivStruct, AlgSys, 3);
+t = ReducedNewmarkSol.TimeParams.sample;
+
+% upper graph
+q = NewmarkSol.q;
+qX = q(103, :) * loadDirection(1);
+qY = q(104, :) * loadDirection(2);
+qZ = q(105, :) * loadDirection(3);
+qDir = qX + qY + qZ;
+
+qr = ReducedNewmarkSol.q;
+qrX = qr(1, :) * loadDirection(1);
+qrY = qr(2, :) * loadDirection(2);
+qrZ = qr(3, :) * loadDirection(3);
+qrDir = qrX + qrY + qrZ;
+
+subplot(2, 1, 1);
+plot(t, 100*(qDir - qrDir)./qDir);
+grid;
+
+% lower graph
+q = NewmarkSol.q;
+qX = q(127, :) * loadDirection(1);
+qY = q(128, :) * loadDirection(2);
+qZ = q(129, :) * loadDirection(3);
+qDir = qX + qY + qZ;
+
+qr = ReducedNewmarkSol.q;
+qrX = qr(5, :) * loadDirection(1);
+qrY = qr(6, :) * loadDirection(2);
+qrZ = qr(7, :) * loadDirection(3);
+qrDir = qrX + qrY + qrZ;
+
+subplot(2, 1, 2);
+plot(t, 100*(qDir - qrDir)./qDir);
+grid;
 end
