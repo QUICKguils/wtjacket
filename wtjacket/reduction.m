@@ -1,4 +1,4 @@
-function [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(Stm, SdivStruct, AlgSys, nMode, m, opts)
+function [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(RunArg, Stm, SdivStruct, AlgSys, m)
 % REDUCTION Study of the reduced models of the wt jacket, from full model.
 %
 % Arguments:
@@ -14,6 +14,10 @@ function [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys
 %	CBReducedFemSol      (struct) -- Solution of the reduced FEM simulation.
 %	ReducedNewmarkSol (struct) -- Solution of the reduced transient problem using newmark.
 
+% Unpack relevant execution parameters.
+LocalRunArg = {RunArg.sdiv, RunArg.nMode, RunArg.opts};
+[~, nMode, opts] = LocalRunArg{:};
+
 % Nodes highlighted in the structure.
 highlightedNodes = [18, 22];
 
@@ -23,7 +27,7 @@ dofMask = [true true true false false true];
 
 % Sort DOFs
 nClampedDOFs = 24; % TODO improve this
-
+[remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask, nClampedDOFs);
 
 % 1 - Guyans-Irons Method - STATIC CONDENSATION.
 [GI_R, GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs);
@@ -39,14 +43,14 @@ TimeParams = set_time_parameters(timeSample, Stm.INITIAL_CONDITIONS);
 [DiscreteLoad, FullLoad] = reducedLoad(CBReducedSdivStruct, SdivStruct, AlgSys, TimeParams, CB_R, remainingDOFs, condensedDOFs);
 
 % Integrate
-ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, CBReducedSdivStruct, CBReducedAlgSys, TimeParams, DiscreteLoad, FullLoad, nMode, opts);
+ReducedNewmarkSol = newmark_integrate_reduced_system(Stm, CBReducedSdivStruct, CBReducedAlgSys, TimeParams, DiscreteLoad, FullLoad, nMode, opts);
 end
 
 function [DiscreteLoad, FullLoad] = reducedLoad(CBReducedSdivStruct, SdivStruct, AlgSys, TimeParams, R, remainingDOFs, condensedDOFs)
 % Choose the load to study.
 lookupLoadLabel = 1;
 FullLoad = SdivStruct.loadList{lookupLoadLabel};
-FullDiscreteLoad = FullLoad.set_discrete_load(AlgSys.nDof_free, TimeParams.sample);
+FullDiscreteLoad = FullLoad.set_discrete_load(AlgSys.nDofFree, TimeParams.sample);
 s = FullDiscreteLoad.sample;
 
 % Ignore clamped dofs
@@ -63,13 +67,9 @@ for t = 1:length(TimeParams.sample)
     DiscreteLoad.sample(:, t) = R' * S(:, t); % using R matrix from CB
 end
 DiscreteLoad.node = CBReducedSdivStruct.nodeList{1, 1};
-
-% Reduce applied load
-
-ReducedNewmarkSol = newmark_integrate_reduced_system(Stm, CBReducedSdivStruct, CBReducedAlgSys, TimeParams, DiscreteLoad, ThisLoad, nMode, opts);
 end
 
-function ReducedNewmarkSol = newmark_integrate_reduced_system(Cst, ReducedSdivStruct, ReducedAlgSys, TimeParams, DiscreteLoad, ThisLoad, nMode, opts)
+function ReducedNewmarkSol = newmark_integrate_reduced_system(Stm, ReducedSdivStruct, ReducedAlgSys, TimeParams, DiscreteLoad, ThisLoad, nMode, opts)
 % NEWMARK INTEGRATE REDUCED SYSTEM
 % Solve with newmark.
 ReducedNewmarkSol = newmark(ReducedAlgSys, TimeParams, DiscreteLoad.sample);
