@@ -73,7 +73,7 @@ function ReducedNewmarkSol = newmark_integrate_reduced_system(Stm, ReducedSdivSt
 % NEWMARK INTEGRATE REDUCED SYSTEM
 % Solve with newmark.
 ReducedNewmarkSol = newmark(ReducedAlgSys, TimeParams, DiscreteLoad.sample);
-
+ReducedNewmarkSol.TimeParams = TimeParams;
 % Plot displacements at hightlighted nodes.
 if contains(opts, 'p')
     lookupNodeLabels = [1, 2];
