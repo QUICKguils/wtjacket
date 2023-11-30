@@ -17,13 +17,14 @@ optargs(1:numel(varargin)) = varargin;
 
 % Fetch and overwrite the defaults execution parameters.
 RunArg = load_defaults();
+RunArg.method = 'n';
 RunArg.opts = '';
 % Fetch the project statement data.
 Stm = load_statement();
 % Compute the FEM solution.
 [~, SdivStruct, AlgSys, FemSol] = modeling(RunArg, Stm);
 % Compute the mode superposition parameters.
-[AlgSys, ~] = transient(RunArg, Stm, SdivStruct, AlgSys, FemSol);
+[AlgSys, TransientSol] = transient(RunArg, Stm, SdivStruct, AlgSys, FemSol);
 
 
 %% Compute convergence data
@@ -94,6 +95,7 @@ loadDirection = ThisLoad.direction;
 
 ReductionSol = reduction(RunArg, Stm, SdivStruct, AlgSys);
 ReducedNewmarkSol = ReductionSol.ReducedNewmarkSol;
+NewmarkSol = TransientSol.Newmark;
 t = ReducedNewmarkSol.TimeParams.sample;
 
 % upper graph
