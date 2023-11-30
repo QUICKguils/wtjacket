@@ -87,7 +87,7 @@ TimeParams.initialConditions = Stm.INITIAL_CONDITIONS;
 
 % Solve with newmark.
 ReducedNewmarkSol = newmark(ReducedAlgSys, TimeParams, DiscreteLoad.sample);
-
+ReducedNewmarkSol.TimeParams = TimeParams;
 % Plot displacements at hightlighted nodes.
 if contains(opts, 'p')
 	lookupNodeLabels = [1, 2];
