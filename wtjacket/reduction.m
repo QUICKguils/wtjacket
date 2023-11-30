@@ -1,25 +1,27 @@
-function [GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol, CBReducedAlgSys, CBReducedFemSol, ReducedNewmarkSol] = reduction(RunArg, Stm, SdivStruct, AlgSys, m)
+function ReductionSol = reduction(RunArg, Stm, SdivStruct, AlgSys)
 % REDUCTION Study of the reduced models of the wt jacket, from full model.
 %
 % Arguments:
-%	Stm         (struct)  -- Project statement data.
-%	SdivStruct  (struct)  -- Subdivised structure.
-%	AlgSys      (struct)  -- Parameters of the discrete algebraic system.
-%	nMode       (int)     -- Number of computed modes.
-%	opts       (1xN char) -- Options.
-%	  'p' -> Enable [P]lots creation.
+%	RunArg       (struct)     -- Code execution parameters, with fields:
+%	  nMode      (int)        -- Number of first mode computed.
+%	  tSet       (1xN double) -- Time sample used for time evolutions.
+%	  nodeLabels (1xN double) -- Label list of nodes to inspect.
+%	  m          (int)        -- Number of modes used in reductions.
+%	  opts       (1xN char)   -- Output options.
+%	    'p' -> Enable [P]lots creation.
+%	Stm        (struct) -- Project statement data.
+%	SdivStruct (struct) -- Subdivised structure.
+%	AlgSys     (struct) -- Parameters of the discrete algebraic system.
 % Returns:
-%	ReducedSdivStruct  (struct) -- Subdivised structure.
-%	CBReducedAlgSys      (struct) -- Parameters of the Craig-Brampton reduced discrete algebraic system.
-%	CBReducedFemSol      (struct) -- Solution of the reduced FEM simulation.
-%	ReducedNewmarkSol (struct) -- Solution of the reduced transient problem using newmark.
+%	ReductionSol (struct) -- Results of the reduction methods, with fields:
+%	  ReducedSdivStruct (struct) -- Subdivised structure.
+%	  CBReducedAlgSys   (struct) -- Parameters of the Craig-Brampton reduced discrete algebraic system.
+%	  CBReducedFemSol   (struct) -- Solution of the reduced FEM simulation.
+%	  ReducedNewmarkSol (struct) -- Solution of the reduced transient problem using newmark.
 
 % Unpack relevant execution parameters.
-LocalRunArg = {RunArg.sdiv, RunArg.nMode, RunArg.opts};
-[~, nMode, opts] = LocalRunArg{:};
-
-% Nodes highlighted in the structure.
-highlightedNodes = [18, 22];
+LocalRunArg = {RunArg.nMode, RunArg.tSet, RunArg.nodeLabels, RunArg.m, RunArg.opts};
+[nMode, tSet, nodeLabels, m, opts] = LocalRunArg{:};
 
 % Remaining DOF per nodes.
 %          x    y    z    \th_x \th_y \th_z
@@ -27,30 +29,35 @@ dofMask = [true true true false false true];
 
 % Sort DOFs
 nClampedDOFs = 24; % TODO improve this
-[remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask, nClampedDOFs);
+[remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, nodeLabels, dofMask);
 
-% 1 - Guyans-Irons Method - STATIC CONDENSATION.
-[GI_R, GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs);
+% 1. Guyans-Irons method - STATIC CONDENSATION
+[~, GIReducedSdivStruct, GIReducedAlgSys, GIReducedFemSol] = R_GuyanIronsReduction(SdivStruct, AlgSys, nMode, remainingDOFs, condensedDOFs);
 
-% 2 - Craig-Brampton Method.
+% 2 - Craig-Brampton method
 [CB_R, CBReducedSdivStruct, CBReducedAlgSys, CBReducedFemSol] = R_CraigBramptonReduction(SdivStruct, AlgSys, nMode, m, remainingDOFs, condensedDOFs);
 
-% 3 - Time integration.
-timeSample = 0:0.01:10;
-TimeParams = set_time_parameters(timeSample, Stm.INITIAL_CONDITIONS);
-
 % Setup reduced load
-[DiscreteLoad, FullLoad] = reducedLoad(CBReducedSdivStruct, SdivStruct, AlgSys, TimeParams, CB_R, remainingDOFs, condensedDOFs);
+[DiscreteLoad, FullLoad] = reducedLoad(CBReducedSdivStruct, SdivStruct, AlgSys, tSet, CB_R, remainingDOFs, condensedDOFs);
 
 % Integrate
-ReducedNewmarkSol = newmark_integrate_reduced_system(Stm, CBReducedSdivStruct, CBReducedAlgSys, TimeParams, DiscreteLoad, FullLoad, nMode, opts);
+ReducedNewmarkSol = newmark_integrate_reduced_system(Stm, CBReducedSdivStruct, CBReducedAlgSys, tSet, DiscreteLoad, FullLoad, nMode, opts);
+
+% 4. Build the return data structure
+
+ReductionSol.GIReducedSdivStruct = GIReducedSdivStruct;
+ReductionSol.GIReducedAlgSys = GIReducedAlgSys;
+ReductionSol.GIReducedFemSol = GIReducedFemSol;
+ReductionSol.CBReducedAlgSys = CBReducedAlgSys;
+ReductionSol.CBReducedFemSol = CBReducedFemSol;
+ReductionSol.ReducedNewmarkSol = ReducedNewmarkSol;
 end
 
-function [DiscreteLoad, FullLoad] = reducedLoad(CBReducedSdivStruct, SdivStruct, AlgSys, TimeParams, R, remainingDOFs, condensedDOFs)
+function [DiscreteLoad, FullLoad] = reducedLoad(CBReducedSdivStruct, SdivStruct, AlgSys, tSet, R, remainingDOFs, condensedDOFs)
 % Choose the load to study.
 lookupLoadLabel = 1;
 FullLoad = SdivStruct.loadList{lookupLoadLabel};
-FullDiscreteLoad = FullLoad.set_discrete_load(AlgSys.nDofFree, TimeParams.sample);
+FullDiscreteLoad = FullLoad.set_discrete_load(AlgSys.nDofFree, tSet);
 s = FullDiscreteLoad.sample;
 
 % Ignore clamped dofs
@@ -58,30 +65,66 @@ s = s(~AlgSys.cstrMask, :);
 
 % Reorder DOFs
 S = zeros(size(s));
-for t =1:length(TimeParams.sample)
-    S(:, t) = [s(remainingDOFs, t); s(condensedDOFs, t)];
+for t =1:length(tSet)
+	S(:, t) = [s(remainingDOFs, t); s(condensedDOFs, t)];
 end
 
 % Reduce discretized applied load
-for t = 1:length(TimeParams.sample)
-    DiscreteLoad.sample(:, t) = R' * S(:, t); % using R matrix from CB
+for t = 1:length(tSet)
+	DiscreteLoad.sample(:, t) = R' * S(:, t); % using R matrix from CB
 end
 DiscreteLoad.node = CBReducedSdivStruct.nodeList{1, 1};
 end
 
-function ReducedNewmarkSol = newmark_integrate_reduced_system(Stm, ReducedSdivStruct, ReducedAlgSys, TimeParams, DiscreteLoad, ThisLoad, nMode, opts)
+function ReducedNewmarkSol = newmark_integrate_reduced_system(Stm, ReducedSdivStruct, ReducedAlgSys, tSet, DiscreteLoad, ThisLoad, nMode, opts)
 % NEWMARK INTEGRATE REDUCED SYSTEM
+
+% Time the time structure that Newmak need.
+TimeParams.sample = tSet;
+TimeParams.steps  = [diff(tSet), tSet(end)-tSet(end-1)];
+TimeParams.numel  = numel(tSet);
+TimeParams.initialConditions = Stm.INITIAL_CONDITIONS;
+
 % Solve with newmark.
 ReducedNewmarkSol = newmark(ReducedAlgSys, TimeParams, DiscreteLoad.sample);
 
 % Plot displacements at hightlighted nodes.
 if contains(opts, 'p')
-    lookupNodeLabels = [1, 2];
-    plot_displacement(ReducedNewmarkSol, TimeParams.sample, lookupNodeLabels, ThisLoad.direction, ReducedSdivStruct.nodeList, nMode);
-end
+	lookupNodeLabels = [1, 2];
+
+	plot_displacement(ReducedNewmarkSol, tSet, lookupNodeLabels, ThisLoad.direction, ReducedSdivStruct.nodeList, nMode);
 end
 
-function [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highlightedNodes, dofMask, nClampedDOFs)
+	function plot_displacement(TransientSol, tSet, lookupNodeLabels, loadDirection, nodeList, nMode)
+		% PLOT_DISPLACEMENT  Plot the time evolution of the displacements.
+
+		allclose(norm(loadDirection), 1);
+
+		figure("WindowStyle", "docked");
+
+		nNode = numel(lookupNodeLabels);
+		for i = 1:nNode
+			qX = TransientSol.q(nodeList{lookupNodeLabels(i)}.dof(1), :) * loadDirection(1);
+			qY = TransientSol.q(nodeList{lookupNodeLabels(i)}.dof(2), :) * loadDirection(2);
+			qZ = TransientSol.q(nodeList{lookupNodeLabels(i)}.dof(3), :) * loadDirection(3);
+
+			qDir = qX + qY + qZ;
+
+			subplot(nNode, 1, i);
+			plot(tSet, qDir);
+			xlabel("Time (s)");
+			ylabel("Displacement (dir: [" + num2str(loadDirection, '%.3f  ') + "])");
+			title('Transient response', ...
+				['(node: ', num2str(lookupNodeLabels(i)), ...
+				', method: ', TransientSol.name, ...
+				', order: ', num2str(nMode), ')']);
+			grid;
+		end
+	end
+
+end
+
+function [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, nodeLabels, dofMask)
 % SORT DOFS Sort structural dofs into remainingDOFs, condensedDOFs vectors
 % Arguments:
 %	SdivStruct          (struct) -- Subdivised structure.
@@ -93,8 +136,8 @@ function [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, highligh
 %   condensedDOFs       (nDOF-nb x int) -- Array of condensed excluded dofs of the structure
 
 remainingDOFs = [];
-for k=1:length(highlightedNodes)
-	remainingDOFs = [remainingDOFs SdivStruct.nodeList{1, highlightedNodes(k)}.dof(dofMask)];
+for k=1:length(nodeLabels)
+	remainingDOFs = [remainingDOFs SdivStruct.nodeList{1, nodeLabels(k)}.dof(dofMask)];
 end
 
 % since clamped dofs

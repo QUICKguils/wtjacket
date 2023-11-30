@@ -16,17 +16,20 @@ Default.nMode = 8;
 % See: analysis/transient_analysis.m
 Default.tSet = 0:0.01:10;
 
+% Label list of nodes to inspect.
+Default.nodeLabels = [18, 22];
+
 % Methods used to compute the transient response.
 %   'd' -> Mode [D]isplacement method.
 %   'a' -> Mode [A]cceleration method.
 %   'n' -> [N]ewmark (time integration).
 Default.method = 'dan';
 
+% Number of first modes used in the reduction methods.
+Default.m = 3;
+
 % Output options.
 %   'p' -> Enable [P]lots creation.
 %   's' -> [S]ave generated data.
 Default.opts = 'ps';
-
-% Label list of nodes to inspect.
-Default.nodeLabels = [18, 22];
 end

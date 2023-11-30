@@ -1,44 +1,71 @@
-function reduction_analysis(Stm, SdivStruct, AlgSys, FemSol)
+function reduction_analysis(varargin)
 % REDUCTION_ANALYSIS  Analyze the results of the reduction part.
+%
+% Argument:
+%	mSet (1xN int) -- Number of modes in the reduction (default: 1:50).
 
-% Packing relevant execution parameters.
-RunArg.sdiv = 0;
-RunArg.nMode = 8;
+%% Set input arguments
+
+% Set default value for optional inputs.
+optargs = {1:50};
+% Overwrite default value of optional inputs.
+optargs(1:numel(varargin)) = varargin;
+% Place optional args in memorable variable names.
+[mSet] = optargs{:};
+
+%% Precompute dependencies
+
+% Fetch and overwrite the defaults execution parameters.
+RunArg = load_defaults();
 RunArg.opts = '';
+% Fetch the project statement data.
+Stm = load_statement();
+% Compute the FEM solution.
+[~, SdivStruct, AlgSys, FemSol] = modeling(RunArg, Stm);
+% Compute the mode superposition parameters.
+[AlgSys, ~] = transient(RunArg, Stm, SdivStruct, AlgSys, FemSol);
 
-% taking ref frequencies*1.02 as target
+
+%% Compute convergence data
+
+% Taking ref frequencies*1.02 as target.
 ref_freq = FemSol.frequencyHertz;
 target_ref_freq = 1.02 .* ref_freq;
 
-% for m = 0, kinda
+% For m = 0, kinda.
 tic;
-[~, ~, GIReducedFemSol, ~, ~, ~] = reduction(RunArg, Stm, SdivStruct, AlgSys, 1);
-t_GI = toc
+RunArg.m = 1;
+ReductionSol = reduction(RunArg, Stm, SdivStruct, AlgSys);
+GIReducedFemSol = ReductionSol.GIReducedFemSol;
+t_GI = toc;
 freq_array = [GIReducedFemSol.frequencyHertz];
 
 
-% non-exhaustive reduced system study
-m_arr = 1:50;
-n_m = length(m_arr)
+% Non-exhaustive reduced system study.
+n_m = length(mSet);
 t_CB = zeros(1, n_m);
 
 for i=1:n_m
 	tic;
-	[~, ~, ~, ~, CBReducedFemSol, ~] = reduction(RunArg, Stm, SdivStruct, AlgSys, m_arr(i));
+	RunArg.m = mSet(i);
+	ReductionSol = reduction(RunArg, Stm, SdivStruct, AlgSys);
+	CBReducedFemSol = ReductionSol.CBReducedFemSol;
 	t_CB(i) = toc;
 	freq_array = [freq_array CBReducedFemSol.frequencyHertz];
 end
 
-m_arr = [0 m_arr];
+mSet = [0 mSet];
 t_CB = [t_GI t_CB];
 t_CB = 1000 * t_CB;
 
-% relative error 
+% relative error
 rel_error_f = 100 * abs((freq_array-target_ref_freq)./target_ref_freq);
+
+%% Plot the convergence results
 
 % plot freq convergence
 figure("WindowStyle", "docked");
-plot(m_arr, freq_array);
+plot(mSet, freq_array);
 xlabel("Number of sub-eigenmodes taken for R matrix computation");
 ylabel("Frequency (Hz)");
 ylim([0, 100])
@@ -46,7 +73,7 @@ grid;
 
 % rel convergence
 figure("WindowStyle", "docked");
-plot(m_arr, rel_error_f);
+plot(mSet, rel_error_f);
 xlabel("Number of sub-eigenmodes taken for R matrix computation");
 ylabel("% Absolute Relative Error on Frequencies (-)");
 ylim([0, 10])
@@ -54,7 +81,7 @@ grid;
 
 % plot computation time
 figure("WindowStyle", "docked");
-plot(m_arr, t_CB);
+plot(mSet, t_CB);
 xlabel("Number of sub-eigenmodes taken for R matrix computation");
 ylabel("Computation time (ms)");
 grid;
