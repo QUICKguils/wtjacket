@@ -1,5 +1,5 @@
 function ReductionSol = reduction(RunArg, Stm, SdivStruct, AlgSys)
-% REDUCTION Study of the reduced models of the wt jacket, from full model.
+% REDUCTION  Reduced models of the wt jacket.
 %
 % Arguments:
 %	RunArg       (struct)     -- Code execution parameters, with fields:
