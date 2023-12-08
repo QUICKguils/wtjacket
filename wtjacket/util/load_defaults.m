@@ -25,7 +25,7 @@ Default.nodeLabels = [18, 22];
 %   'n' -> [N]ewmark (time integration).
 Default.method = 'dan';
 
-% Number of first modes used in the reduction methods.
+% Number of first modes used in reductions.
 Default.m = 3;
 
 % Output options.

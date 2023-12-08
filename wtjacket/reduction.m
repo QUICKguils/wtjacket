@@ -1,12 +1,12 @@
 function ReductionSol = reduction(RunArg, Stm, SdivStruct, AlgSys)
-% REDUCTION Study of the reduced models of the wt jacket, from full model.
+% REDUCTION  Reduced models of the wt jacket.
 %
 % Arguments:
 %	RunArg       (struct)     -- Code execution parameters, with fields:
 %	  nMode      (int)        -- Number of first mode computed.
 %	  tSet       (1xN double) -- Time sample used for time evolutions.
 %	  nodeLabels (1xN double) -- Label list of nodes to inspect.
-%	  m          (int)        -- Number of modes used in reductions.
+%	  m          (int)        -- Number of first modes used in reductions.
 %	  opts       (1xN char)   -- Output options.
 %	    'p' -> Enable [P]lots creation.
 %	Stm        (struct) -- Project statement data.
@@ -28,7 +28,6 @@ LocalRunArg = {RunArg.nMode, RunArg.tSet, RunArg.nodeLabels, RunArg.m, RunArg.op
 dofMask = [true true true false false true];
 
 % Sort DOFs
-nClampedDOFs = 24; % TODO improve this
 [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, nodeLabels, dofMask);
 
 % 1. Guyans-Irons method - STATIC CONDENSATION

@@ -10,7 +10,8 @@ function MECA0029_Group_3(RunArg)
 %	    'd' -> Mode [D]isplacement method.
 %	    'a' -> Mode [A]cceleration method.
 %	    'n' -> [N]ewmark (time integration).
-%	  opts   (1xN char) -- Output options.
+%	  t      (int)        -- Number of first modes used in reductions.
+%	  opts   (1xN char)   -- Output options.
 %	    'p' -> Enable [P]lots creation.
 %	    's' -> [S]ave generated data.
 %

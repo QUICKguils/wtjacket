@@ -33,10 +33,7 @@ level, and will store these data in appropriate `.MAT` files.
 
 For example:
 ```matlab
-% Fetch the default code execution parameters.
-RunArg = load_defaults();
-
-% Override the defaults:
+% Override the default code execution parameters:
 RunArg.sdiv   = 4;    % 4 subdivisions in the bare structure,
 RunArg.method = 'n';  % Only use Newmark to compute the transient response.
 RunARg.opts   = 's';  % Only save the computed data, don't plot them.
@@ -62,8 +59,7 @@ SdivStruct = load("res\subdivisedStructure.mat");
 AlgSys     = load("res\algebraicSystem.mat");
 FemSol     = load("res\femSolution.mat");
 
-% Fetch and override the default code execution parameters:
-RunArg = load_defaults();
+% Override the default code execution parameters:
 RunArg.nMode      = 6;         % Number of computed first modes.
 RunARg.opts       = 'p';       % Enable plots creation.
 RunARg.nodeLabels = [14, 21];  % Compute solution for nodes 14 and 21.
@@ -95,7 +91,8 @@ modeling_analysis(1:8, 8);
     the wind turbine jacket, using 3D beam elements.
   - `transient.m` implements the second part of the project, namely the
     transient response due to a harmonic excitation.
-  - `reduction.m` implements the third part of the project, namely the ...
+  - `reduction.m` implements the third part of the project, namely the reduced
+    models of the wind turbine jacket.
   - `analysis/`: functions that analyze the results obtained from the main
     subfunctions.
   - `object/`: object-oriented representation of the vibration problem. In this
