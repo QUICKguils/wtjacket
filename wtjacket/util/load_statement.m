@@ -1,5 +1,5 @@
-function Stm = load_statement_data
-% LOAD_STATEMENT_DATA  Information provided by the project statement.
+function Stm = load_statement
+% LOAD_STATEMENT  Information provided by the project statement.
 %
 % This function returns a structure that contains the data provided by
 % the statement, which are used throughout the project.
@@ -21,7 +21,5 @@ Stm.MOMENTUM_TRANSFER    = 0.85;      % Proportion of the momentum transferred t
 Stm.FORCE_DIRECTION      = 45;        % Direction of the impact force, w.r.t. the X-axis [°].
 Stm.INITIAL_CONDITIONS   = [0, 0];    % Initial conditions of the transient response [m, m/s].
 Stm.DAMPING_RATIO        = 5e-3;      % Damping ratio of the first two modes [-].
-
-%% Reduction methods
 
 end

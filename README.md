@@ -33,7 +33,7 @@ level, and will store these data in appropriate `.MAT` files.
 
 For example:
 ```matlab
-% Override the default code execution parameters:
+% Override some default code execution parameters:
 RunArg.sdiv   = 4;    % 4 subdivisions in the bare structure,
 RunArg.method = 'n';  % Only use Newmark to compute the transient response.
 RunARg.opts   = 's';  % Only save the computed data, don't plot them.

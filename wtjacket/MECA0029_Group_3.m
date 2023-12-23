@@ -3,15 +3,16 @@ function MECA0029_Group_3(RunArg)
 %
 % Argument:
 %	RunArg (struct) -- Optional code execution parameters, with fields:
-%	  sdiv   (int)        -- Number of subsivisions in the bare structure.
-%	  nMode  (int)        -- Number of computed first modes.
-%	  tSet   (1xN double) -- Time sample used for time evolutions.
-%	  method (1xN char)   -- Methods used for the transient response.
+%	  sdiv       (int)        -- Number of subsivisions in the bare structure.
+%	  nMode      (int)        -- Number of computed first modes.
+%	  tSet       (1xN double) -- Time sample used for time evolutions.
+%	  nodeLabels (1xN int)    -- Label list of nodes to inspect.
+%	  method     (1xN char)   -- Methods used for the transient response.
 %	    'd' -> Mode [D]isplacement method.
 %	    'a' -> Mode [A]cceleration method.
 %	    'n' -> [N]ewmark (time integration).
-%	  t      (int)        -- Number of first modes used in reductions.
-%	  opts   (1xN char)   -- Output options.
+%	  m          (int)        -- Number of first modes used in reductions.
+%	  opts       (1xN char)   -- Output options.
 %	    'p' -> Enable [P]lots creation.
 %	    's' -> [S]ave generated data.
 %
