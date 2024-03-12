@@ -36,7 +36,7 @@ For example:
 % Override some default code execution parameters:
 RunArg.sdiv   = 4;    % 4 subdivisions in the bare structure,
 RunArg.method = 'n';  % Only use Newmark to compute the transient response.
-RunARg.opts   = 's';  % Only save the computed data, don't plot them.
+RunArg.opts   = 's';  % Only save the computed data, don't plot them.
 
 % Launch the main function.
 MECA0029_Group_3(RunArg);
@@ -61,8 +61,8 @@ FemSol     = load("res\femSolution.mat");
 
 % Override the default code execution parameters:
 RunArg.nMode      = 6;         % Number of computed first modes.
-RunARg.opts       = 'p';       % Enable plots creation.
-RunARg.nodeLabels = [14, 21];  % Compute solution for nodes 14 and 21.
+RunArg.opts       = 'p';       % Enable plots creation.
+RunArg.nodeLabels = [14, 21];  % Compute solution for nodes 14 and 21.
 
 % Run the code for the transient part, based on a modal superposition of the
 % first six modes, for the nodes 14 and 21, and with plots drawing enabled.
