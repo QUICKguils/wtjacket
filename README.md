@@ -17,6 +17,9 @@ the matlab path:
 ```matlab
 addpath(genpath(rootDir));
 ```
+This makes visible, among other things, the utility script called
+`refresh_workspace`. Executing this script either load or refresh the saved
+computed data in the global workspace.
 
 ## Advanced usage
 
@@ -34,11 +37,11 @@ level, and will store these data in appropriate `.MAT` files.
 For example:
 ```matlab
 % Override some default code execution parameters:
-RunArg.sdiv   = 4;    % 4 subdivisions in the bare structure,
-RunArg.method = 'n';  % Only use Newmark to compute the transient response.
-RunArg.opts   = 's';  % Only save the computed data, don't plot them.
+RunArg.sdiv   = 4;    % 4 subdivisions in the bare structure
+RunArg.method = 'n';  % Only use Newmark to compute the transient response
+RunArg.opts   = 's';  % Only save the computed data, don't plot them
 
-% Launch the main function.
+% Launch the main function
 MECA0029_Group_3(RunArg);
 ```
 
@@ -53,16 +56,13 @@ The usage of these main subfunctions is quite flexible. The user can refer to
 the corresponding docstring for an exhaustive explanation.
 For example:
 ```matlab
-% Load the appropriated, previously generated data.
-Stm        = load("res\statement.mat");
-SdivStruct = load("res\subdivisedStructure.mat");
-AlgSys     = load("res\algebraicSystem.mat");
-FemSol     = load("res\femSolution.mat");
+% Load the previously generated data
+refresh_workspace;
 
 % Override the default code execution parameters:
-RunArg.nMode      = 6;         % Number of computed first modes.
-RunArg.opts       = 'p';       % Enable plots creation.
-RunArg.nodeLabels = [14, 21];  % Compute solution for nodes 14 and 21.
+RunArg.nMode      = 6;         % Number of computed first modes
+RunArg.opts       = 'p';       % Enable plots creation
+RunArg.nodeLabels = [14, 21];  % Compute solution for nodes 14 and 21
 
 % Run the code for the transient part, based on a modal superposition of the
 % first six modes, for the nodes 14 and 21, and with plots drawing enabled.
