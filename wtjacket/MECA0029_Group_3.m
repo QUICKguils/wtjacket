@@ -2,21 +2,21 @@ function MECA0029_Group_3(RunArg)
 % MECA0029_Group_3  Trigger all the code of the project.
 %
 % Argument:
-%	RunArg (struct) -- Optional code execution parameters, with fields:
-%	  sdiv       (int)        -- Number of subsivisions in the bare structure.
-%	  nMode      (int)        -- Number of computed first modes.
-%	  tSet       (1xN double) -- Time sample used for time evolutions.
-%	  nodeLabels (1xN int)    -- Label list of nodes to inspect.
-%	  method     (1xN char)   -- Methods used for the transient response.
-%	    'd' -> Mode [D]isplacement method.
-%	    'a' -> Mode [A]cceleration method.
-%	    'n' -> [N]ewmark (time integration).
-%	  m          (int)        -- Number of first modes used in reductions.
-%	  opts       (1xN char)   -- Output options.
-%	    'p' -> Enable [P]lots creation.
-%	    's' -> [S]ave generated data.
+%   RunArg (struct) -- Optional code execution parameters, with fields:
+%     sdiv       (int)        -- Number of subsivisions in the bare structure.
+%     nMode      (int)        -- Number of computed first modes.
+%     tSet       (1xN double) -- Time sample used for time evolutions.
+%     nodeLabels (1xN int)    -- Label list of nodes to inspect.
+%     method     (1xN char)   -- Methods used for the transient response.
+%       'd' -> Mode [D]isplacement method.
+%       'a' -> Mode [A]cceleration method.
+%       'n' -> [N]ewmark (time integration).
+%     m          (int)        -- Number of first modes used in reductions.
+%     opts       (1xN char)   -- Output options.
+%       'p' -> Enable [P]lots creation.
+%       's' -> [S]ave generated data.
 %
-% The default values unsed to run this function
+% The default values used to run this function
 % are stored in util/load_defaults.m
 
 %% Set program initial state

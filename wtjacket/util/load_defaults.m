@@ -1,5 +1,5 @@
 function Default = load_defaults
-% LOAD_DEFAULTS  Default values used throughout the source code.
+% LOAD_DEFAULTS  Default execution parameters used throughout the source code.
 
 % Number of subdivisions in the bare structure.
 Default.sdiv = 3;

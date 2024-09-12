@@ -2,22 +2,22 @@ function ReductionSol = reduction(RunArg, Stm, SdivStruct, AlgSys)
 % REDUCTION  Reduced models of the wt jacket.
 %
 % Arguments:
-%	RunArg       (struct)     -- Code execution parameters, with fields:
-%	  nMode      (int)        -- Number of first mode computed.
-%	  tSet       (1xN double) -- Time sample used for time evolutions.
-%	  nodeLabels (1xN double) -- Label list of nodes to inspect.
-%	  m          (int)        -- Number of first modes used in reductions.
-%	  opts       (1xN char)   -- Output options.
-%	    'p' -> Enable [P]lots creation.
-%	Stm        (struct) -- Project statement data.
-%	SdivStruct (struct) -- Subdivised structure.
-%	AlgSys     (struct) -- Parameters of the discrete algebraic system.
+%   RunArg       (struct)     -- Code execution parameters, with fields:
+%     nMode      (int)        -- Number of first mode computed.
+%     tSet       (1xN double) -- Time sample used for time evolutions.
+%     nodeLabels (1xN double) -- Label list of nodes to inspect.
+%     m          (int)        -- Number of first modes used in reductions.
+%     opts       (1xN char)   -- Output options.
+%       'p' -> Enable [P]lots creation.
+%   Stm        (struct) -- Project statement data.
+%   SdivStruct (struct) -- Subdivised structure.
+%   AlgSys     (struct) -- Parameters of the discrete algebraic system.
 % Returns:
-%	ReductionSol (struct) -- Results of the reduction methods, with fields:
-%	  ReducedSdivStruct (struct) -- Subdivised structure.
-%	  CBReducedAlgSys   (struct) -- Parameters of the Craig-Brampton reduced discrete algebraic system.
-%	  CBReducedFemSol   (struct) -- Solution of the reduced FEM simulation.
-%	  ReducedNewmarkSol (struct) -- Solution of the reduced transient problem using newmark.
+%   ReductionSol (struct) -- Results of the reduction methods, with fields:
+%     ReducedSdivStruct (struct) -- Subdivised structure.
+%     CBReducedAlgSys   (struct) -- Parameters of the Craig-Brampton reduced discrete algebraic system.
+%     CBReducedFemSol   (struct) -- Solution of the reduced FEM simulation.
+%     ReducedNewmarkSol (struct) -- Solution of the reduced transient problem using newmark.
 
 % Unpack relevant execution parameters.
 LocalRunArg = {RunArg.nMode, RunArg.tSet, RunArg.nodeLabels, RunArg.m, RunArg.opts};
@@ -125,14 +125,15 @@ end
 
 function [remainingDOFs, condensedDOFs] = sort_DOFS(SdivStruct, AlgSys, nodeLabels, dofMask)
 % SORT DOFS Sort structural dofs into remainingDOFs, condensedDOFs vectors
+%
 % Arguments:
-%	SdivStruct          (struct) -- Subdivised structure.
-%	AlgSys              (struct) -- Parameters of the discrete algebraic system.
-%	highlightedNodes    (nNodes x Node) -- Array of Node Index used for sorting.
-%	dofMask             (6 x boolean) -- True for kept dof at nodes (x, y, z, theta_x, theta_y, theta_z)
+%   SdivStruct       (struct)        -- Subdivised structure.
+%   AlgSys           (struct)        -- Parameters of the discrete algebraic system.
+%   highlightedNodes (nNodes x Node) -- Array of Node Index used for sorting.
+%   dofMask          (6 x boolean)   -- True for kept dof at nodes (x, y, z, theta_x, theta_y, theta_z)
 % Returns:
-%   remainingDOFs       (nb x int) -- Array of selected remaining dofs of the structure
-%   condensedDOFs       (nDOF-nb x int) -- Array of condensed excluded dofs of the structure
+%   remainingDOFs (nb x int)      -- Array of selected remaining dofs of the structure
+%   condensedDOFs (nDOF-nb x int) -- Array of condensed excluded dofs of the structure
 
 remainingDOFs = [];
 for k=1:length(nodeLabels)
@@ -156,6 +157,7 @@ end
 
 function ReducedFemSol = solve_eigenvalue_problem_mass_normalized(AlgSys, nMode)
 % SOLVE EIGENVALUE PROBLEM MASS NORMALIZED
+%
 % Arguments:
 %   Algsys
 %   nMode
@@ -163,6 +165,7 @@ function ReducedFemSol = solve_eigenvalue_problem_mass_normalized(AlgSys, nMode)
 %   ReducedFemSol
 
 [Modes, ReducedFemSol.Omega] = eigs(AlgSys.K, AlgSys.M, nMode, 'sm');
+
 % Mass-normalize modes per definition
 for i = 1:nMode
 	MassNormalizedModes(:, i) = Modes(:, i) / sqrt(Modes(:, i)' * AlgSys.M * Modes(:, i));
@@ -176,6 +179,7 @@ end
 function [reorderedA, Arr, Arc, Acr, Acc] = submatrixRecomposition(A, r, c)
 % SUBMATRIX RECOMPOSITION Decomposes A into Arr, Arc, Acr, Acc, given r, c
 % A = [Arr Arc; Acr Acc]
+%
 % Arguments:
 %   A   matrix
 %   r   index for r part of decomposition
